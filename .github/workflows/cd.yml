@@ -1,0 +1,90 @@
+name: web-cd
+
+# Builds the web player (what share links open in a browser), pushes it to
+# GHCR, then restarts just that container on the production server. The API
+# and the admin console keep serving - see docs/deployment.md in
+# mela-admin-web.
+#
+# Secrets (repository or organization): SERVER_HOST, SERVER_USER,
+# SERVER_SSH_KEY (or SERVER_PASSWORD), SERVER_SSH_FINGERPRINT, DEPLOY_PATH.
+
+on:
+  push:
+    branches:
+      - main
+    # What goes into the image.
+    paths:
+      - 'src/**'
+      - 'nginx/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'vite.config.ts'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/cd.yml'
+  workflow_dispatch:  # Redeploy the player unchanged, from the Actions tab
+
+# One deploy of the player at a time.
+concurrency:
+  group: cd-production-web
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy-production:
+    name: Build and deploy the web player
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set lowercase repository owner
+        run: echo "REPO_OWNER_LOWER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Build and Push Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          cache-from: type=gha,scope=mela-web
+          cache-to: type=gha,mode=max,scope=mela-web
+          tags: |
+            ghcr.io/${{ env.REPO_OWNER_LOWER }}/mela-web:latest
+            ghcr.io/${{ env.REPO_OWNER_LOWER }}/mela-web:${{ github.sha }}
+
+      - name: Deploy to Production
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          # A deploy key; the password is only a fallback while there is none.
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          # The server's host key, so nothing else can pose as it.
+          fingerprint: ${{ secrets.SERVER_SSH_FINGERPRINT }}
+          script_stop: true
+          script: |
+            echo "Deploying the web player..."
+
+            # The server pulls with its own read-only registry login
+            # (docs/deployment.md): no token of this job is left behind there.
+            cd "${{ secrets.DEPLOY_PATH }}"
+            docker compose pull web
+            # Only the player: --no-deps leaves the API and the rest alone.
+            docker compose up -d --no-deps web
+            docker compose ps web

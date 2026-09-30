@@ -1,0 +1,13 @@
+# Only what the image build needs.
+node_modules
+dist
+coverage
+.env*
+*.log
+Dockerfile
+.dockerignore
+# The repository's own tooling.
+.github
+README.md
+.editorconfig
+.gitignore

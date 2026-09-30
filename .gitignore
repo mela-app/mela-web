@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+*.log
+*.local
+
+# Local settings - never commit them.
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
