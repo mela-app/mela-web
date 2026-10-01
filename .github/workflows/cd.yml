@@ -1,23 +1,9 @@
 name: CD
 
-# Builds the web player (what share links open in a browser), pushes it to
-# GHCR, then restarts just that container on the production server. The API
-# and the admin console keep serving - see docs/deployment.md in
-# mela-admin-web.
-#
-# Secrets (repository or organization): SERVER_HOST, SERVER_USER,
-# SERVER_PASSWORD, DEPLOY_PATH.
-
 on:
   push:
     branches:
       - main   # Trigger Production deploy
-  workflow_dispatch:  # Manual run from Actions tab
-
-# One deploy of the player at a time.
-concurrency:
-  group: cd-production-web
-  cancel-in-progress: false
 
 jobs:
   build-and-deploy-production:
@@ -28,9 +14,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -48,8 +31,6 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          cache-from: type=gha,scope=mela-web
-          cache-to: type=gha,mode=max,scope=mela-web
           tags: |
             ghcr.io/${{ env.REPO_OWNER_LOWER }}/mela-web:latest
             ghcr.io/${{ env.REPO_OWNER_LOWER }}/mela-web:${{ github.sha }}
@@ -60,11 +41,10 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          script_stop: true
           script: |
             set -euo pipefail
             echo "🚀 Deploying to Production..."
-
+            
             # Login to GHCR
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
