@@ -64,10 +64,10 @@ jobs:
           script: |
             echo "🚀 Deploying to Production..."
 
-            # The server pulls with its own read-only registry login
-            # (docs/deployment.md): no token of this job is left behind there.
+            # Login to GHCR
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
             cd "${{ secrets.DEPLOY_PATH }}"
-            docker compose pull web
-            # Only the player: --no-deps leaves the API and the rest alone.
-            docker compose up -d --no-deps web
-            docker compose ps web
+            docker compose down
+            docker compose pull
+            docker compose up -d
