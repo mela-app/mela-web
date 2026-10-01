@@ -64,3 +64,21 @@ export const PinIcon = (props: IconProps) => (
     <path d="M12 17v5M9 3h6l-1 7 4 3v2H6v-2l4-3-1-7z" />
   </Icon>
 )
+
+export const MessageIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5A8 8 0 1 1 21 12z" />
+  </Icon>
+)
+
+export const BackIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M15 18l-6-6 6-6" />
+  </Icon>
+)
+
+export const EditIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+  </Icon>
+)

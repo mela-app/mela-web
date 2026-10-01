@@ -1,10 +1,13 @@
 /** A failed API call, with the server's own message when it gave one. */
 export class ApiError extends Error {
   readonly status: number
+  /** What went wrong, for the page rather than the person - e.g. `NOT_FRIENDS`. */
+  readonly code: string | undefined
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -32,14 +35,25 @@ export async function api<T>(path: string, { body, token, headers, ...init }: Ap
   }
   if (response.status === 204) return undefined as T
   const payload: unknown = await response.json().catch(() => null)
-  if (!response.ok) throw new ApiError(response.status, messageOf(payload) ?? 'Something went wrong. Try again.')
+  if (!response.ok) {
+    const { message, code } = errorOf(payload)
+    throw new ApiError(response.status, message ?? 'Something went wrong. Try again.', code)
+  }
   return payload as T
 }
 
-function messageOf(payload: unknown): string | null {
-  if (typeof payload !== 'object' || payload === null) return null
-  const message = (payload as { message?: unknown }).message
-  if (typeof message === 'string') return message
-  if (Array.isArray(message) && typeof message[0] === 'string') return message[0]
-  return null
+// The API wraps the framework's error body: `{statusCode, path, timestamp, message: <body>}`,
+// <body> being a string or `{message: string | string[], code?}`. A flat `{message}` works too.
+function errorOf(payload: unknown): { message: string | null; code?: string } {
+  if (typeof payload !== 'object' || payload === null) return { message: null }
+  let body = (payload as { message?: unknown }).message
+  let code: string | undefined
+  if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+    const inner = body as { message?: unknown; code?: unknown }
+    code = typeof inner.code === 'string' ? inner.code : undefined
+    body = inner.message
+  }
+  if (typeof body === 'string') return { message: body, code }
+  if (Array.isArray(body) && typeof body[0] === 'string') return { message: body[0], code }
+  return { message: null, code }
 }

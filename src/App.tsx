@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AuthDialog } from './auth/AuthDialog'
 import { Avatar } from './components/Avatar'
-import { CloseIcon, HeartIcon, ShareIcon, StageIcon } from './components/Icons'
+import { CloseIcon, HeartIcon, MessageIcon, ShareIcon, StageIcon } from './components/Icons'
 import { MelaLogo } from './components/MelaLogo'
+import { Modal } from './components/Modal'
 import type { PlayerConfig } from './config'
 import { installUrl, liveUrl, openApp } from './lib/appLinks'
 import type { Device } from './lib/device'
+import { compactCount } from './lib/format'
 import { useMediaQuery, useTimedNudge } from './lib/hooks'
 import type { WebSession, WebUser } from './lib/session'
 import { ChatList } from './live/ChatList'
@@ -16,6 +18,8 @@ import { HostBar } from './live/HostBar'
 import { Stage } from './live/Stage'
 import { useHearts } from './live/useHearts'
 import { useLive } from './live/useLive'
+import { Inbox } from './messages/Inbox'
+import { useUnreadMessages } from './messages/useUnreadMessages'
 import { authCopy, type Gate } from './copy'
 import { GetAppBar } from './nudges/GetAppBar'
 import { InstallSheet } from './nudges/InstallSheet'
@@ -52,6 +56,10 @@ export function App({ config, session, device }: AppProps) {
   const onPhone = device.mobile
   const pageUrl = liveUrl(config, window.location.origin)
   const storeUrl = installUrl(config, device.platform)
+  // Direct messages on computers; phones have them in the app.
+  const messaging = user !== null && !onPhone
+  const unread = useUnreadMessages(session, messaging, live.inbox)
+  const [inboxOpen, setInboxOpen] = useState(false)
 
   const [nudged, dismissNudge] = useTimedNudge(state.phase === 'live' && user === null, NUDGE_AFTER_MS, NUDGE_KEY)
   const asking: Gate | null = gate ?? (nudged && user === null ? 'timed' : null)
@@ -131,6 +139,7 @@ export function App({ config, session, device }: AppProps) {
     </button>
   )
   const logOut = () => void session.logout()
+  const inboxButton = messaging && <InboxButton unread={unread} onClick={() => setInboxOpen(true)} />
 
   let main: ReactNode
   if (state.phase === 'ended' || state.phase === 'banned') {
@@ -224,7 +233,14 @@ export function App({ config, session, device }: AppProps) {
         <aside className="side" aria-label="Live chat">
           <header className="side-header">
             <MelaLogo className="side-logo" />
-            {user ? <Account user={user} onLogout={logOut} /> : signIn}
+            {user ? (
+              <div className="header-end">
+                {inboxButton}
+                <Account user={user} onLogout={logOut} />
+              </div>
+            ) : (
+              signIn
+            )}
           </header>
           {alert}
           {chat}
@@ -246,9 +262,12 @@ export function App({ config, session, device }: AppProps) {
         <div className="stage-top">
           {hostBar}
           {user ? (
-            <button type="button" className="btn btn-small btn-quiet" onClick={logOut}>
-              Log out
-            </button>
+            <div className="header-end stage-top-end">
+              {inboxButton}
+              <button type="button" className="btn btn-small btn-quiet" onClick={logOut}>
+                Log out
+              </button>
+            </div>
           ) : (
             signIn
           )}
@@ -268,6 +287,11 @@ export function App({ config, session, device }: AppProps) {
       {onPhone && <GetAppBar onOpen={openInApp} />}
       {main}
       {dialog}
+      {inboxOpen && user && !onPhone && (
+        <Modal labelledBy="inbox-title" variant="drawer" onClose={() => setInboxOpen(false)}>
+          <Inbox session={session} self={user} events={live.inbox} />
+        </Modal>
+      )}
       {toast && (
         <div className="toast" role="status">
           {toast}
@@ -287,6 +311,25 @@ function IconButton(props: { label: string; className?: string; onClick(): void;
       onClick={props.onClick}
     >
       {props.children}
+    </button>
+  )
+}
+
+function InboxButton({ unread, onClick }: { unread: number; onClick(): void }) {
+  return (
+    <button
+      type="button"
+      className="icon-btn inbox-btn"
+      aria-label={unread > 0 ? `Inbox, ${unread} unread` : 'Inbox'}
+      title="Inbox"
+      onClick={onClick}
+    >
+      <MessageIcon />
+      {unread > 0 && (
+        <span className="inbox-count" aria-hidden="true">
+          {compactCount(unread)}
+        </span>
+      )}
     </button>
   )
 }

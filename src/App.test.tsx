@@ -1,12 +1,13 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App, NUDGE_AFTER_MS, NUDGE_KEY } from './App'
 import type { PlayerConfig } from './config'
 import type { Device } from './lib/device'
 import { WebSession, type WebUser } from './lib/session'
 import { initialLiveState, liveReducer, type LiveAction } from './live/liveReducer'
 import type { Live } from './live/useLive'
+import { createInboxEvents } from './messages/events'
 
 const current = vi.hoisted(() => ({ live: null as unknown }))
 vi.mock('./live/useLive', () => ({ useLive: () => current.live }))
@@ -22,7 +23,10 @@ const config: PlayerConfig = {
 const phone: Device = { platform: 'android', mobile: true }
 const computer: Device = { platform: 'other', mobile: false }
 
-function watching(...then: LiveAction[]): Live {
+// Tests play the server's part on the inbox events.
+type TestLive = Live & { inbox: ReturnType<typeof createInboxEvents> }
+
+function watching(...then: LiveAction[]): TestLive {
   let state = liveReducer(initialLiveState, {
     type: 'watching',
     watch: {
@@ -36,7 +40,7 @@ function watching(...then: LiveAction[]): Live {
     },
   })
   for (const action of then) state = liveReducer(state, action)
-  const live: Live = {
+  const live: TestLive = {
     state,
     tiles: [],
     connected: true,
@@ -48,10 +52,21 @@ function watching(...then: LiveAction[]): Live {
     sendLike: vi.fn(),
     setFollowing: vi.fn(async () => undefined),
     dismissAlert: vi.fn(),
+    inbox: createInboxEvents(),
   }
   current.live = live
   return live
 }
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+// The API as the inbox sees it; anything else is not found.
+const fetchMock = vi.fn<typeof fetch>(async (input) => {
+  if (String(input) === '/v1/me/conversations/unread-count') return json(200, { count: 3 })
+  if (String(input) === '/v1/me/conversations') return json(200, { items: [], hasMore: false, nextCursor: null })
+  return json(404, { message: 'Not found' })
+})
 
 const signedOut = () => new WebSession({ getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
 
@@ -66,8 +81,12 @@ function signedIn(): WebSession {
 }
 
 describe('App', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock)
+  })
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
   })
 
   describe('on a phone', () => {
@@ -104,6 +123,12 @@ describe('App', () => {
       }
       expect(live.sendLike).not.toHaveBeenCalled()
       expect(live.setFollowing).not.toHaveBeenCalled()
+    })
+
+    it('leaves messaging to the app', () => {
+      watching()
+      render(<App config={config} session={signedIn()} device={phone} />)
+      expect(screen.queryByRole('button', { name: /^Inbox/ })).not.toBeInTheDocument()
     })
   })
 
@@ -150,6 +175,24 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Log out' }))
 
       expect(session.logout).toHaveBeenCalledOnce()
+    })
+
+    it('shows a signed-in viewer their unread messages, and opens the inbox beside the live', async () => {
+      const live = watching()
+      render(<App config={config} session={signedIn()} device={computer} />)
+
+      expect(await screen.findByRole('button', { name: 'Inbox, 3 unread' })).toBeInTheDocument()
+      act(() => live.inbox.emit({ type: 'unreadCount', count: 0 }))
+      await userEvent.click(screen.getByRole('button', { name: 'Inbox' }))
+
+      expect(screen.getByRole('dialog', { name: 'Inbox' })).toBeInTheDocument()
+      expect(await screen.findByText('No messages yet')).toBeInTheDocument()
+    })
+
+    it('has no inbox without an account', () => {
+      watching()
+      render(<App config={config} session={signedOut()} device={computer} />)
+      expect(screen.queryByRole('button', { name: /^Inbox/ })).not.toBeInTheDocument()
     })
 
     it('after a minute of watching, asks them to log in - once', () => {

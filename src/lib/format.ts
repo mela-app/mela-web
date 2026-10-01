@@ -16,3 +16,30 @@ export function initials(name: string): string {
     .join('')
   return letters.toUpperCase() || '?'
 }
+
+const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'short' })
+const monthDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+const clock = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+
+/** "now", "5m", "3h", "Mon", "Sep 3" - how long ago, for a list row. */
+export function shortTime(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso)
+  const minutes = Math.floor((now.getTime() - then.getTime()) / 60_000)
+  if (minutes < 1) return 'now'
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h`
+  return hours < 24 * 7 ? weekday.format(then) : monthDay.format(then)
+}
+
+/** "2:05 PM", "Yesterday 2:05 PM", "Mon 2:05 PM", "Sep 3, 2:05 PM" - between messages. */
+export function messageTime(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso)
+  const time = clock.format(then)
+  const startOf = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const days = Math.round((startOf(now) - startOf(then)) / 86_400_000)
+  if (days === 0) return time
+  if (days === 1) return `Yesterday ${time}`
+  if (days < 7) return `${weekday.format(then)} ${time}`
+  return `${monthDay.format(then)}, ${time}`
+}

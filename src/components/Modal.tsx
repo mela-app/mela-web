@@ -4,8 +4,8 @@ import { CloseIcon } from './Icons'
 interface ModalProps {
   labelledBy: string
   onClose(): void
-  /** A sheet rises from the bottom (phones); centered is a dialog (computers). */
-  variant?: 'sheet' | 'center'
+  /** A sheet rises from the bottom (phones); centered is a dialog (computers); a drawer sits at the right edge. */
+  variant?: 'sheet' | 'center' | 'drawer'
   children: ReactNode
 }
 

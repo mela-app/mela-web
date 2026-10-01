@@ -2,6 +2,8 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
 import { api, ApiError } from '../lib/api'
 import type { WebSession } from '../lib/session'
+import { createInboxEvents, type InboxEvents } from '../messages/events'
+import type { DirectMessage } from '../messages/types'
 import { startWatching, type VideoTile, type WatchSession } from '../video/watch'
 import { chatErrorMessage } from './chatErrors'
 import { initialLiveState, liveReducer, type LiveState } from './liveReducer'
@@ -34,6 +36,8 @@ export interface Live {
   sendLike(): void
   setFollowing(following: boolean): Promise<void>
   dismissAlert(): void
+  /** The signed-in account's direct message events, from the same connection. */
+  inbox: InboxEvents
 }
 
 /**
@@ -54,6 +58,7 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
   const videoRef = useRef<WatchSession | null>(null)
   const pendingLikes = useRef(0)
   const likeTimer = useRef<number | null>(null)
+  const [inbox] = useState(createInboxEvents)
 
   const retry = useCallback(() => {
     dispatch({ type: 'retry' })
@@ -193,6 +198,7 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     socket.on('connect', () => {
       authRetried = false
       void enter()
+      if (asAccount) inbox.emit({ type: 'connected' })
     })
     // Turned away at the door: a signed-in socket renews its token once (or
     // signs out and comes back watch-only); a ticket that ran out means starting over.
@@ -257,13 +263,23 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     socket.on('chat:unmuted', (event: { streamId: string }) => {
       if (here(event)) dispatch({ type: 'chatUnmuted' })
     })
+    // Direct messages: only ever to the account's own sockets.
+    socket.on('message:new', (event: { message: DirectMessage; sender: Person; recipient: Person }) => {
+      inbox.emit({ type: 'new', ...event })
+    })
+    socket.on('message:read', (event: { readerId: string; partnerId: string; readAt: string }) => {
+      inbox.emit({ type: 'read', ...event })
+    })
+    socket.on('message:unread_count', (event: { count: number }) => {
+      inbox.emit({ type: 'unreadCount', count: event.count })
+    })
 
     return () => {
       settle(false)
       socketRef.current = null
       socket.disconnect()
     }
-  }, [playing, ticket, hostId, signedIn, streamId, session, retry])
+  }, [playing, ticket, hostId, signedIn, streamId, session, retry, inbox])
 
   // Signed in on this page: whether they already follow the host.
   useEffect(() => {
@@ -353,5 +369,6 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     sendLike,
     setFollowing,
     dismissAlert,
+    inbox,
   }
 }
