@@ -1,15 +1,18 @@
 
 services:
-  mela-web:
-    image: mela-web:local
-    restart: unless-stopped
-    container_name: ${CONTAINER_NAME}
+  web:
+    # `image` + `build` together means `docker compose build` tags the local
+    # image with this name, while the deploy host can `docker compose pull`
+    # the exact artifact CD pushed to GHCR.
+    image: ghcr.io/${REPO_OWNER:-brightsystems}/elshaday-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Local builds only - see the note above.
+        API_BASE_URL: ${API_BASE_URL:-https://api.melaapi.kefta-ticket.com}
     ports:
-      - "${PORT_OUT}:${PORT_IN}"
-    env_file:
-      - .env
-    networks:
-      - system-net
-networks:
-  system-net:
-    external: true
+      # Default is 8081, not 8080, so it can coexist with another stack on the
+      # same host. The reverse proxy for guzo.elshadayet.com forwards here.
+      - '${WEB_PORT:-8081}:80'
+    restart: unless-stopped
