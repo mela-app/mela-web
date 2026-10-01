@@ -65,9 +65,9 @@ The page loads the two fixed file names, so they must stay `player.js` and
 
 The `Dockerfile` builds the production image: `dist/` behind unprivileged
 nginx under `/web/`, the fixed names revalidated on every load and the
-hashed assets cached for a year. On the server it runs next to the API, on
-`127.0.0.1:8081` behind `https://<api domain>/web/*` (mela-backend's
-`infra/production`).
+hashed assets cached for a year. On the server it runs in
+`/usr/src/apps/mela/web`, next to the API, behind
+`https://<api domain>/web/*` (mela-admin-web's `docs/deployment.md`).
 
 To run that same image here, with `CONTAINER_NAME`, `PORT_OUT` and
 `PORT_IN` set in `.env` (the compose file joins the external
