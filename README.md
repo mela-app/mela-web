@@ -69,13 +69,16 @@ hashed assets cached for a year. On the server it runs next to the API, on
 `127.0.0.1:8081` behind `https://<api domain>/web/*` (mela-backend's
 `infra/production`).
 
-To run that same image here, with `WEB_PORT` set in `.env`:
+To run that same image here, with `CONTAINER_NAME`, `PORT_OUT` and
+`PORT_IN` set in `.env` (the compose file joins the external
+`system-net` network, so create it first with
+`docker network create system-net`):
 
 ```
-docker compose up -d --build
+docker compose up -d
 ```
 
-Then open `http://localhost:<WEB_PORT>/web/?stream=<live id>`.
+Then open `http://localhost:<PORT_OUT>/web/?stream=<live id>`.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) lints, tests and
 builds every pull request. CD ([.github/workflows/cd.yml](.github/workflows/cd.yml))
