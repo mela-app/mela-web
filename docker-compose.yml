@@ -1,6 +1,6 @@
 
 services:
-  meal-web:
+  mela-web:
     # `image` + `build` together means `docker compose build` tags the local
     # image with this name, while the deploy host can `docker compose pull`
     # the exact artifact CD pushed to GHCR.
