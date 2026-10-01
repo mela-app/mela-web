@@ -4,7 +4,7 @@ services:
     # `image` + `build` together means `docker compose build` tags the local
     # image with this name, while the deploy host can `docker compose pull`
     # the exact artifact CD pushed to GHCR.
-    image: ghcr.io/${REPO_OWNER:-brightsystems}/elshaday-web:${IMAGE_TAG:-latest}
+    image: ghcr.io/${REPO_OWNER:-mellas-app}/mela-web:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
