@@ -69,9 +69,16 @@ hashed assets cached for a year. On the server it runs next to the API, on
 `127.0.0.1:8081` behind `https://<api domain>/web/*` (mela-backend's
 `infra/production`).
 
+To run that same image here, with `WEB_PORT` set in `.env`:
+
+```
+docker compose up -d --build
+```
+
+Then open `http://localhost:<WEB_PORT>/web/?stream=<live id>`.
+
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) lints, tests and
-builds every push. CD ([.github/workflows/cd.yml](.github/workflows/cd.yml))
+builds every pull request. CD ([.github/workflows/cd.yml](.github/workflows/cd.yml))
 builds `ghcr.io/<owner>/mela-web` on `main`, then, over SSH, restarts just
 the player. Its secrets (repository or organization): `SERVER_HOST`,
-`SERVER_USER`, `SERVER_SSH_KEY` (or `SERVER_PASSWORD`),
-`SERVER_SSH_FINGERPRINT`, `DEPLOY_PATH`.
+`SERVER_USER`, `SERVER_PASSWORD`, `DEPLOY_PATH`.

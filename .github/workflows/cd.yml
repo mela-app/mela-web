@@ -1,4 +1,4 @@
-name: web-cd
+name: CD
 
 # Builds the web player (what share links open in a browser), pushes it to
 # GHCR, then restarts just that container on the production server. The API
@@ -6,25 +6,13 @@ name: web-cd
 # mela-admin-web.
 #
 # Secrets (repository or organization): SERVER_HOST, SERVER_USER,
-# SERVER_SSH_KEY (or SERVER_PASSWORD), SERVER_SSH_FINGERPRINT, DEPLOY_PATH.
+# SERVER_PASSWORD, DEPLOY_PATH.
 
 on:
   push:
     branches:
-      - main
-    # What goes into the image.
-    paths:
-      - 'src/**'
-      - 'nginx/**'
-      - 'index.html'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig*.json'
-      - 'vite.config.ts'
-      - 'Dockerfile'
-      - '.dockerignore'
-      - '.github/workflows/cd.yml'
-  workflow_dispatch:  # Redeploy the player unchanged, from the Actions tab
+      - main   # Trigger Production deploy
+  workflow_dispatch:  # Manual run from Actions tab
 
 # One deploy of the player at a time.
 concurrency:
@@ -33,7 +21,6 @@ concurrency:
 
 jobs:
   build-and-deploy-production:
-    name: Build and deploy the web player
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -72,14 +59,10 @@ jobs:
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
-          # A deploy key; the password is only a fallback while there is none.
-          key: ${{ secrets.SERVER_SSH_KEY }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          # The server's host key, so nothing else can pose as it.
-          fingerprint: ${{ secrets.SERVER_SSH_FINGERPRINT }}
           script_stop: true
           script: |
-            echo "Deploying the web player..."
+            echo "🚀 Deploying to Production..."
 
             # The server pulls with its own read-only registry login
             # (docs/deployment.md): no token of this job is left behind there.
