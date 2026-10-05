@@ -19,9 +19,19 @@ export interface StreamInfo {
   channelName: string
 }
 
+/** Where the host put a guest's tile, as shares of the stage's guest area (docs/features/guests.md). */
+export interface GuestPlacement {
+  x: number
+  y: number
+  /** The tile's width as a share of the area's; tiles are 3:4 portrait. */
+  size: number
+}
+
 export interface Guest extends Person {
   /** Agora only: how the video tells this guest apart. */
   agoraUid: number | null
+  /** Null or missing: the automatic column. */
+  placement?: GuestPlacement | null
 }
 
 export interface PinnedMessage {

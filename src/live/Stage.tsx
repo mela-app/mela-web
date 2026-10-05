@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Avatar } from '../components/Avatar'
 import { SoundOffIcon } from '../components/Icons'
 import type { Fit, VideoTile } from '../video/watch'
@@ -24,9 +24,12 @@ export function Stage(props: StageProps) {
   const { tiles, fit, host, guests, connecting, paused, hostAway, audioBlocked, videoLost } = props
   const hostTile = tiles.find((tile) => tile.isHost)
   const guestTiles = tiles.filter((tile) => !tile.isHost)
-  const nameOf = (tile: VideoTile) =>
+  const guestOf = (tile: VideoTile) =>
     guests.find((guest) => guest.id === tile.userId || (tile.agoraUid !== undefined && guest.agoraUid === tile.agoraUid))
-      ?.displayName
+  const nameOf = (tile: VideoTile) => guestOf(tile)?.displayName
+  // Where the host put a tile, the same shares of the guest area as in the app; the rest line up.
+  const placedTiles = guestTiles.filter((tile) => guestOf(tile)?.placement)
+  const lineTiles = guestTiles.filter((tile) => !guestOf(tile)?.placement)
 
   return (
     <div className="stage">
@@ -40,11 +43,25 @@ export function Stage(props: StageProps) {
         )
       )}
 
-      {guestTiles.length > 0 && (
+      {lineTiles.length > 0 && (
         <div className="stage-guests">
-          {guestTiles.map((tile) => (
+          {lineTiles.map((tile) => (
             <TileView key={tile.key} tile={tile} fit="cover" className="tile tile-guest" label={nameOf(tile)} />
           ))}
+        </div>
+      )}
+
+      {placedTiles.length > 0 && (
+        <div className="stage-guest-area">
+          {placedTiles.map((tile) => {
+            const placement = guestOf(tile)!.placement!
+            const style = { '--x': placement.x, '--y': placement.y, '--size': placement.size } as CSSProperties
+            return (
+              <div key={tile.key} className="tile-guest-placed" style={style}>
+                <TileView tile={tile} fit="cover" className="tile tile-guest" label={nameOf(tile)} />
+              </div>
+            )
+          })}
         </div>
       )}
 

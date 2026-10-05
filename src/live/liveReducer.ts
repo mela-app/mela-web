@@ -1,4 +1,4 @@
-import type { AdminAlert, ChatMessage, Guest, PinnedMessage, RoomState, WatchResponse } from './types'
+import type { AdminAlert, ChatMessage, Guest, GuestPlacement, PinnedMessage, RoomState, WatchResponse } from './types'
 
 // A long live's older messages drop off; the page shows what's on now.
 export const MAX_MESSAGES = 100
@@ -43,6 +43,7 @@ export type LiveAction =
   | { type: 'moderators'; ids: string[] }
   | { type: 'guestJoined'; guest: Guest }
   | { type: 'guestLeft'; userId: string }
+  | { type: 'guestPlaced'; userId: string; placement: GuestPlacement | null }
   | { type: 'following'; following: boolean }
   | { type: 'chatMuted'; until: Date | null }
   | { type: 'chatUnmuted' }
@@ -121,6 +122,13 @@ export function liveReducer(state: LiveState, action: LiveAction): LiveState {
       return { ...state, guests: [...state.guests.filter((guest) => guest.id !== action.guest.id), action.guest] }
     case 'guestLeft':
       return { ...state, guests: state.guests.filter((guest) => guest.id !== action.userId) }
+    case 'guestPlaced':
+      return {
+        ...state,
+        guests: state.guests.map((guest) =>
+          guest.id === action.userId ? { ...guest, placement: action.placement } : guest,
+        ),
+      }
     case 'following':
       return { ...state, isFollowingHost: action.following }
     case 'chatMuted':

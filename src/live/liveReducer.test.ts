@@ -57,6 +57,14 @@ describe('liveReducer', () => {
     expect(state.guests).toEqual([])
   })
 
+  it('moves a guest where the host put them, and back in line', () => {
+    const placement = { x: 0, y: 1, size: 0.4 }
+    let state = liveReducer(playing(), { type: 'guestPlaced', userId: 'guest-1', placement })
+    expect(state.guests[0].placement).toEqual(placement)
+    state = liveReducer(state, { type: 'guestPlaced', userId: 'guest-1', placement: null })
+    expect(state.guests[0].placement).toBeNull()
+  })
+
   it('takes the room as the server has it', () => {
     const state = liveReducer(playing(), {
       type: 'room',
