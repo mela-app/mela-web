@@ -7,7 +7,7 @@ import type { DirectMessage } from '../messages/types'
 import { startWatching, type VideoTile, type WatchSession } from '../video/watch'
 import { chatErrorMessage } from './chatErrors'
 import { initialLiveState, liveReducer, type LiveState } from './liveReducer'
-import type { Ack, AdminAlert, ChatMessage, Person, RoomState, WatchResponse } from './types'
+import type { Ack, AdminAlert, ChatMessage, GuestPlacement, Person, RoomState, WatchResponse } from './types'
 
 // A second's taps go out as one batch, at most this many (backend: MAX_LIKES_PER_BATCH).
 const LIKE_BATCH_MS = 1000
@@ -246,6 +246,9 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     })
     socket.on('guest:removed', (event: { streamId: string; userId: string }) => {
       if (here(event)) dispatch({ type: 'guestLeft', userId: event.userId })
+    })
+    socket.on('guest:placed', (event: { streamId: string; userId: string; placement: GuestPlacement | null }) => {
+      if (here(event)) dispatch({ type: 'guestPlaced', userId: event.userId, placement: event.placement })
     })
     socket.on('stream_ended', (event: { streamId: string; reason?: string; message?: string }) => {
       if (here(event)) dispatch({ type: 'ended', reason: event.reason ?? null, message: event.message ?? null })
