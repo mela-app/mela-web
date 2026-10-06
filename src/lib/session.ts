@@ -7,11 +7,19 @@ export interface WebUser {
   avatarUrl: string | null
 }
 
-export interface SignupFields {
+/** What a new account would start with (backend: auth/identity/identity-sign-in.service.ts). */
+export interface NewAccountProfile {
+  email: string
+  displayName: string
+  suggestedUsername: string
+}
+
+export type IdentityOutcome = { status: 'SIGNED_IN' } | { status: 'NEEDS_ACCOUNT'; profile: NewAccountProfile }
+
+export interface NewAccount {
+  idToken: string
   username: string
   displayName: string
-  email: string
-  password: string
 }
 
 // Only after a sign-in here does a visit ask the API for a session.
@@ -106,11 +114,25 @@ export class WebSession {
     await this.adopt(accessToken)
   }
 
-  async signup(fields: SignupFields): Promise<void> {
-    const { accessToken } = await api<{ accessToken: string }>('/v1/auth/web/signup', {
+  /** Continue with Google: signed in when they have an account, else what theirs would start with. */
+  async continueWithIdentity(idToken: string): Promise<IdentityOutcome> {
+    const result = await api<{ status: 'SIGNED_IN'; accessToken: string } | ({ status: 'NEEDS_ACCOUNT' } & NewAccountProfile)>(
+      '/v1/auth/web/identity',
+      { method: 'POST', headers: CLIENT, body: { idToken } },
+    )
+    if (result.status === 'SIGNED_IN') {
+      await this.adopt(result.accessToken)
+      return { status: 'SIGNED_IN' }
+    }
+    const { email, displayName, suggestedUsername } = result
+    return { status: 'NEEDS_ACCOUNT', profile: { email, displayName, suggestedUsername } }
+  }
+
+  async createAccount(account: NewAccount): Promise<void> {
+    const { accessToken } = await api<{ accessToken: string }>('/v1/auth/web/identity/signup', {
       method: 'POST',
       headers: CLIENT,
-      body: fields,
+      body: account,
     })
     await this.adopt(accessToken)
   }

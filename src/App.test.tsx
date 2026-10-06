@@ -140,8 +140,19 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Like' }))
 
       expect(screen.getByRole('dialog', { name: 'Log in to send likes' })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: 'Sign up' })).toBeInTheDocument()
+      // This page has no Firebase settings: new accounts are made in the app.
+      expect(screen.getByText('New to Mela? Sign up in the app, then log in here.')).toBeInTheDocument()
       expect(live.sendLike).not.toHaveBeenCalled()
+    })
+
+    it("offers Continue with Google once the page has Firebase's settings", async () => {
+      watching()
+      const firebase = { apiKey: 'key', authDomain: 'mela.firebaseapp.com', projectId: 'mela', appId: '1:2:web:3' }
+      render(<App config={{ ...config, firebase }} session={signedOut()} device={computer} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Like' }))
+
+      expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument()
     })
 
     it('hands the stage over to their phone', async () => {

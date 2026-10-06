@@ -873,28 +873,6 @@
   margin: 4px auto 16px;
 }
 
-.tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  margin-bottom: 16px;
-  padding: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-}
-.tabs button {
-  height: 36px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-weight: 700;
-  cursor: pointer;
-}
-.tabs button[aria-selected='true'] {
-  background: var(--teal);
-  color: #fff;
-}
 .auth-form {
   display: flex;
   flex-direction: column;
@@ -926,6 +904,38 @@
 .field-problem {
   font-size: 12px;
   color: #ff8fa3;
+}
+.field-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+/* Google's own look for its sign-in: white, with its mark. */
+.btn-google {
+  gap: 10px;
+  background: #fff;
+  color: #1f1f1f;
+}
+.btn-google:hover:not(:disabled) {
+  background: #f1f3f4;
+}
+.auth-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 .form-error {
   margin: 0;

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "agora-rtc-sdk-ng": "^4.24.8",
+    "firebase": "^12.19.0",
     "livekit-client": "^2.22.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

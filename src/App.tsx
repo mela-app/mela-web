@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AuthDialog } from './auth/AuthDialog'
+import { firebaseGoogleSignIn } from './auth/googleSignIn'
 import { Avatar } from './components/Avatar'
 import { CloseIcon, HeartIcon, MessageIcon, ShareIcon, StageIcon } from './components/Icons'
 import { MelaLogo } from './components/MelaLogo'
@@ -60,6 +61,8 @@ export function App({ config, session, device }: AppProps) {
   const messaging = user !== null && !onPhone
   const unread = useUnreadMessages(session, messaging, live.inbox)
   const [inboxOpen, setInboxOpen] = useState(false)
+  // Signing up on the web is Google's; without Firebase's settings, it's the app's.
+  const google = useMemo(() => (config.firebase ? firebaseGoogleSignIn(config.firebase) : null), [config.firebase])
 
   const [nudged, dismissNudge] = useTimedNudge(state.phase === 'live' && user === null, NUDGE_AFTER_MS, NUDGE_KEY)
   const asking: Gate | null = gate ?? (nudged && user === null ? 'timed' : null)
@@ -130,7 +133,9 @@ export function App({ config, session, device }: AppProps) {
     dialog = <StageDialog hostName={hostName} url={pageUrl} onClose={close} />
   } else if (asking && !user) {
     const { title, body } = authCopy(asking, hostName)
-    dialog = <AuthDialog session={session} title={title} body={body} onSignedIn={signedIn} onClose={close} />
+    dialog = (
+      <AuthDialog session={session} google={google} title={title} body={body} onSignedIn={signedIn} onClose={close} />
+    )
   }
 
   const signIn = !onPhone && !user && (

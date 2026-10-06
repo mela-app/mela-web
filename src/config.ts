@@ -1,3 +1,11 @@
+/** Firebase's public web settings, for Continue with Google (backend: share/web-fallback.controller.ts). */
+export interface FirebaseWebConfig {
+  apiKey: string
+  authDomain: string
+  projectId: string
+  appId: string
+}
+
 /** What the share page tells the player (backend: share/web-fallback.controller.ts). */
 export interface PlayerConfig {
   streamId: string
@@ -5,9 +13,18 @@ export interface PlayerConfig {
   androidPackage: string
   androidInstallUrl: string
   iosInstallUrl: string | null
+  /** Absent until Firebase's web app is set up: signing up then happens in the app. */
+  firebase?: FirebaseWebConfig
 }
 
 const filled = (value: unknown): value is string => typeof value === 'string' && value.length > 0
+
+function firebaseOf(value: unknown): FirebaseWebConfig | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const { apiKey, authDomain, projectId, appId } = value as Partial<Record<keyof FirebaseWebConfig, unknown>>
+  if (!filled(apiKey) || !filled(authDomain) || !filled(projectId) || !filled(appId)) return undefined
+  return { apiKey, authDomain, projectId, appId }
+}
 
 /**
  * The page's settings, from the JSON the share page embeds - or, on Vite's
@@ -22,7 +39,8 @@ export function readPlayerConfig(doc: Document, location: Pick<Location, 'search
       const { streamId, appScheme, androidPackage, androidInstallUrl, iosInstallUrl } = config
       if (!filled(streamId) || !filled(appScheme) || !filled(androidPackage) || !filled(androidInstallUrl)) return null
       if (iosInstallUrl !== null && !filled(iosInstallUrl)) return null
-      return { streamId, appScheme, androidPackage, androidInstallUrl, iosInstallUrl }
+      const firebase = firebaseOf(config.firebase)
+      return { streamId, appScheme, androidPackage, androidInstallUrl, iosInstallUrl, ...(firebase && { firebase }) }
     } catch {
       return null
     }
@@ -33,11 +51,19 @@ export function readPlayerConfig(doc: Document, location: Pick<Location, 'search
   const appScheme = import.meta.env.VITE_APP_URL_SCHEME
   const androidPackage = import.meta.env.VITE_ANDROID_APP_PACKAGE_NAME
   if (!streamId || !filled(appScheme) || !filled(androidPackage)) return null
+  const env = import.meta.env
+  const firebase = firebaseOf({
+    apiKey: env.VITE_FIREBASE_API_KEY,
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: env.VITE_FIREBASE_PROJECT_ID,
+    appId: env.VITE_FIREBASE_APP_ID,
+  })
   return {
     streamId,
     appScheme,
     androidPackage,
     androidInstallUrl: `https://play.google.com/store/apps/details?id=${encodeURIComponent(androidPackage)}`,
     iosInstallUrl: null,
+    ...(firebase && { firebase }),
   }
 }
