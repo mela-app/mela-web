@@ -261,6 +261,26 @@
   top: calc(var(--y) * (100cqh - var(--w) * 4 / 3));
   width: var(--w);
   pointer-events: auto;
+  transition:
+    left 240ms cubic-bezier(0.215, 0.61, 0.355, 1),
+    top 240ms cubic-bezier(0.215, 0.61, 0.355, 1),
+    width 240ms cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+/* Dragged on the host's phone: glide between previews, which come about every 100ms. */
+.tile-guest-placed.is-moving {
+  transition-duration: 120ms;
+  transition-timing-function: linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile-guest-placed {
+    transition: none;
+  }
+}
+/* The guest filling the stage: named up top, clear of the chat. */
+.tile-host > .tile-label {
+  top: 72px;
+  bottom: auto;
+  left: 10px;
 }
 .tile-guest-placed .tile-guest {
   width: 100%;

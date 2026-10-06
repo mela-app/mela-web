@@ -173,6 +173,7 @@ export function App({ config, session, device }: AppProps) {
         fit={wide ? 'contain' : 'cover'}
         host={host}
         guests={state.guests}
+        moving={state.moving}
         connecting={state.phase === 'loading' || !live.connected}
         paused={state.paused}
         hostAway={state.hostAway}

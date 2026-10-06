@@ -17,6 +17,8 @@ export interface LiveState {
   messages: ChatMessage[]
   pinned: PinnedMessage | null
   guests: Guest[]
+  /** Tiles the host or a moderator is dragging right now - a preview, until the drop. */
+  moving: Record<string, GuestPlacement>
   isFollowingHost: boolean
   /** Muted in this live's chat: until when, or null for the rest of it. */
   chatMute: { until: Date | null } | null
@@ -44,6 +46,9 @@ export type LiveAction =
   | { type: 'guestJoined'; guest: Guest }
   | { type: 'guestLeft'; userId: string }
   | { type: 'guestPlaced'; userId: string; placement: GuestPlacement | null }
+  | { type: 'guestMoving'; userId: string; placement: GuestPlacement }
+  | { type: 'guestMoveEnded'; userId: string }
+  | { type: 'guestSpotlight'; userId: string | null }
   | { type: 'following'; following: boolean }
   | { type: 'chatMuted'; until: Date | null }
   | { type: 'chatUnmuted' }
@@ -63,6 +68,7 @@ export const initialLiveState: LiveState = {
   messages: [],
   pinned: null,
   guests: [],
+  moving: {},
   isFollowingHost: false,
   chatMute: null,
   endedReason: null,
@@ -80,6 +86,7 @@ export function liveReducer(state: LiveState, action: LiveAction): LiveState {
         watch: action.watch,
         pinned: action.watch.pinnedMessage,
         guests: action.watch.activeGuests,
+        moving: {},
         isFollowingHost: action.watch.isFollowingHost,
       }
     case 'failed':
@@ -121,13 +128,28 @@ export function liveReducer(state: LiveState, action: LiveAction): LiveState {
     case 'guestJoined':
       return { ...state, guests: [...state.guests.filter((guest) => guest.id !== action.guest.id), action.guest] }
     case 'guestLeft':
-      return { ...state, guests: state.guests.filter((guest) => guest.id !== action.userId) }
+      return {
+        ...state,
+        guests: state.guests.filter((guest) => guest.id !== action.userId),
+        moving: without(state.moving, action.userId),
+      }
     case 'guestPlaced':
       return {
         ...state,
         guests: state.guests.map((guest) =>
           guest.id === action.userId ? { ...guest, placement: action.placement } : guest,
         ),
+        moving: without(state.moving, action.userId),
+      }
+    case 'guestMoving':
+      if (!state.guests.some((guest) => guest.id === action.userId)) return state
+      return { ...state, moving: { ...state.moving, [action.userId]: action.placement } }
+    case 'guestMoveEnded':
+      return action.userId in state.moving ? { ...state, moving: without(state.moving, action.userId) } : state
+    case 'guestSpotlight':
+      return {
+        ...state,
+        guests: state.guests.map((guest) => ({ ...guest, spotlight: guest.id === action.userId })),
       }
     case 'following':
       return { ...state, isFollowingHost: action.following }
@@ -142,4 +164,11 @@ export function liveReducer(state: LiveState, action: LiveAction): LiveState {
     case 'banned':
       return { ...state, phase: 'banned' }
   }
+}
+
+function without<T>(record: Record<string, T>, key: string): Record<string, T> {
+  if (!(key in record)) return record
+  const rest = { ...record }
+  delete rest[key]
+  return rest
 }
