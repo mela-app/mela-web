@@ -65,6 +65,43 @@ describe('liveReducer', () => {
     expect(state.guests[0].placement).toBeNull()
   })
 
+  it('follows a tile while it is dragged, until the drop or until the drag goes quiet', () => {
+    const saved = { x: 0, y: 0, size: 0.3 }
+    const dragged = { x: 0.5, y: 0.5, size: 0.3 }
+    let state = liveReducer(playing(), { type: 'guestPlaced', userId: 'guest-1', placement: saved })
+    state = liveReducer(state, { type: 'guestMoving', userId: 'guest-1', placement: dragged })
+    expect(state.moving).toEqual({ 'guest-1': dragged })
+    expect(state.guests[0].placement).toEqual(saved)
+
+    const dropped = liveReducer(state, { type: 'guestPlaced', userId: 'guest-1', placement: dragged })
+    expect(dropped.moving).toEqual({})
+    expect(dropped.guests[0].placement).toEqual(dragged)
+
+    const quiet = liveReducer(state, { type: 'guestMoveEnded', userId: 'guest-1' })
+    expect(quiet.moving).toEqual({})
+    expect(quiet.guests[0].placement).toEqual(saved)
+
+    expect(liveReducer(state, { type: 'guestLeft', userId: 'guest-1' }).moving).toEqual({})
+  })
+
+  it('ignores a drag of someone not on stage', () => {
+    const state = playing()
+    expect(liveReducer(state, { type: 'guestMoving', userId: 'ghost', placement: { x: 0, y: 0, size: 0.3 } })).toBe(
+      state,
+    )
+    expect(liveReducer(state, { type: 'guestMoveEnded', userId: 'ghost' })).toBe(state)
+  })
+
+  it('puts one guest at a time on the full stage, and gives it back to the host', () => {
+    let state = liveReducer(playing(), { type: 'guestJoined', guest: { ...host, id: 'guest-2', agoraUid: 8 } })
+    state = liveReducer(state, { type: 'guestSpotlight', userId: 'guest-1' })
+    expect(state.guests.map((guest) => guest.spotlight)).toEqual([true, false])
+    state = liveReducer(state, { type: 'guestSpotlight', userId: 'guest-2' })
+    expect(state.guests.map((guest) => guest.spotlight)).toEqual([false, true])
+    state = liveReducer(state, { type: 'guestSpotlight', userId: null })
+    expect(state.guests.some((guest) => guest.spotlight)).toBe(false)
+  })
+
   it('takes the room as the server has it', () => {
     const state = liveReducer(playing(), {
       type: 'room',

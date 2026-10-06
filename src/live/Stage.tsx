@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { Avatar } from '../components/Avatar'
 import { SoundOffIcon } from '../components/Icons'
 import type { Fit, VideoTile } from '../video/watch'
-import type { Guest, Person } from './types'
+import type { Guest, GuestPlacement, Person } from './types'
 
 interface StageProps {
   tiles: VideoTile[]
@@ -10,6 +10,8 @@ interface StageProps {
   /** Null until the live has loaded. */
   host: Person | null
   guests: Guest[]
+  /** Tiles being dragged right now, where they are - over where they were saved. */
+  moving?: Record<string, GuestPlacement>
   connecting: boolean
   paused: boolean
   hostAway: boolean
@@ -21,20 +23,36 @@ interface StageProps {
 
 /** The host's video, anyone on stage beside it, and what to say when there's nothing to show. */
 export function Stage(props: StageProps) {
-  const { tiles, fit, host, guests, connecting, paused, hostAway, audioBlocked, videoLost } = props
+  const { tiles, fit, host, guests, moving = {}, connecting, paused, hostAway, audioBlocked, videoLost } = props
   const hostTile = tiles.find((tile) => tile.isHost)
-  const guestTiles = tiles.filter((tile) => !tile.isHost)
   const guestOf = (tile: VideoTile) =>
     guests.find((guest) => guest.id === tile.userId || (tile.agoraUid !== undefined && guest.agoraUid === tile.agoraUid))
-  const nameOf = (tile: VideoTile) => guestOf(tile)?.displayName
+  // A guest on the full stage: the host takes the first spot in the column instead.
+  const featuredTile = tiles.find((tile) => !tile.isHost && guestOf(tile)?.spotlight)
+  const mainTile = featuredTile ?? hostTile
+  const guestTiles = tiles.filter((tile) => !tile.isHost && tile !== featuredTile)
+  const nameOf = (tile: VideoTile) => (tile.isHost ? host?.displayName : guestOf(tile)?.displayName)
+  const placementOf = (tile: VideoTile) => {
+    const guest = guestOf(tile)
+    return guest ? (moving[guest.id] ?? guest.placement) : null
+  }
   // Where the host put a tile, the same shares of the guest area as in the app; the rest line up.
-  const placedTiles = guestTiles.filter((tile) => guestOf(tile)?.placement)
-  const lineTiles = guestTiles.filter((tile) => !guestOf(tile)?.placement)
+  const placedTiles = guestTiles.filter((tile) => placementOf(tile))
+  const lineTiles = [
+    ...(featuredTile && hostTile ? [hostTile] : []),
+    ...guestTiles.filter((tile) => !placementOf(tile)),
+  ]
 
   return (
     <div className="stage">
-      {hostTile ? (
-        <TileView key={hostTile.key} tile={hostTile} fit={fit} className="tile tile-host" />
+      {mainTile ? (
+        <TileView
+          key={mainTile.key}
+          tile={mainTile}
+          fit={fit}
+          className="tile tile-host"
+          label={featuredTile ? nameOf(featuredTile) : undefined}
+        />
       ) : (
         host && (
           <div className="stage-poster">
@@ -54,10 +72,11 @@ export function Stage(props: StageProps) {
       {placedTiles.length > 0 && (
         <div className="stage-guest-area">
           {placedTiles.map((tile) => {
-            const placement = guestOf(tile)!.placement!
+            const placement = placementOf(tile)!
             const style = { '--x': placement.x, '--y': placement.y, '--size': placement.size } as CSSProperties
+            const dragged = guestOf(tile)!.id in moving
             return (
-              <div key={tile.key} className="tile-guest-placed" style={style}>
+              <div key={tile.key} className={dragged ? 'tile-guest-placed is-moving' : 'tile-guest-placed'} style={style}>
                 <TileView tile={tile} fit="cover" className="tile tile-guest" label={nameOf(tile)} />
               </div>
             )

@@ -14,6 +14,8 @@ const LIKE_BATCH_MS = 1000
 const MAX_LIKES_PER_BATCH = 30
 const CHAT_SNAPSHOT = 30
 const ANSWER_TIMEOUT_MS = 8000
+// A dragged tile's preview with nothing newer for this long is dropped - the app's own timeout.
+const MOVE_PREVIEW_TIMEOUT_MS = 1500
 // Signing in reconnects as the account: a message sent meanwhile waits this long for the room.
 const JOIN_WAIT_MS = 5000
 
@@ -250,6 +252,25 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     socket.on('guest:placed', (event: { streamId: string; userId: string; placement: GuestPlacement | null }) => {
       if (here(event)) dispatch({ type: 'guestPlaced', userId: event.userId, placement: event.placement })
     })
+    // A preview while the host or a moderator drags a tile; one that goes quiet (their connection
+    // dropped before the drop) lets the tile settle back where it was saved.
+    const moveTimers = new Map<string, number>()
+    socket.on('guest:moving', (event: { streamId: string; userId: string; placement: GuestPlacement | null }) => {
+      if (!here(event) || !event.placement) return
+      const { userId } = event
+      dispatch({ type: 'guestMoving', userId, placement: event.placement })
+      window.clearTimeout(moveTimers.get(userId))
+      moveTimers.set(
+        userId,
+        window.setTimeout(() => {
+          moveTimers.delete(userId)
+          dispatch({ type: 'guestMoveEnded', userId })
+        }, MOVE_PREVIEW_TIMEOUT_MS),
+      )
+    })
+    socket.on('guest:spotlight', (event: { streamId: string; userId: string | null }) => {
+      if (here(event)) dispatch({ type: 'guestSpotlight', userId: event.userId })
+    })
     socket.on('stream_ended', (event: { streamId: string; reason?: string; message?: string }) => {
       if (here(event)) dispatch({ type: 'ended', reason: event.reason ?? null, message: event.message ?? null })
     })
@@ -280,6 +301,7 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     return () => {
       settle(false)
       socketRef.current = null
+      moveTimers.forEach((timer) => window.clearTimeout(timer))
       socket.disconnect()
     }
   }, [playing, ticket, hostId, signedIn, streamId, session, retry, inbox])

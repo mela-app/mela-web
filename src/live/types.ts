@@ -32,6 +32,8 @@ export interface Guest extends Person {
   agoraUid: number | null
   /** Null or missing: the automatic column. */
   placement?: GuestPlacement | null
+  /** Fills the stage while the host shrinks to a tile; at most one guest has it. */
+  spotlight?: boolean
 }
 
 export interface PinnedMessage {
