@@ -1,23 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { signupProblems } from './auth/validation'
+import { newAccountProblems } from './auth/validation'
 import { authCopy, endedCopy, installCopy } from './copy'
 
-describe('signupProblems', () => {
-  const good = { displayName: 'Abebe', username: 'abebe_1', email: 'abebe@example.com', password: 'secret123' }
+describe('newAccountProblems', () => {
+  const good = { displayName: 'Abebe', username: 'abebe_1' }
 
-  it('passes a good sign-up', () => {
-    expect(signupProblems(good)).toEqual({})
+  it('passes a good new account', () => {
+    expect(newAccountProblems(good)).toEqual({})
   })
 
   it('applies the same rules as the API', () => {
-    expect(signupProblems({ ...good, username: 'ab' }).username).toBeDefined()
-    expect(signupProblems({ ...good, username: 'has space' }).username).toBeDefined()
-    expect(signupProblems({ ...good, username: 'a'.repeat(25) }).username).toBeDefined()
-    expect(signupProblems({ ...good, displayName: '   ' }).displayName).toBe('Enter your name.')
-    expect(signupProblems({ ...good, displayName: 'a'.repeat(51) }).displayName).toBeDefined()
-    expect(signupProblems({ ...good, email: 'not-an-email' }).email).toBeDefined()
-    expect(signupProblems({ ...good, password: 'short12' }).password).toBe('Use at least 8 characters.')
-    expect(signupProblems({ ...good, password: 'a'.repeat(73) }).password).toBeDefined()
+    expect(newAccountProblems({ ...good, username: 'ab' }).username).toBeDefined()
+    expect(newAccountProblems({ ...good, username: 'has space' }).username).toBeDefined()
+    expect(newAccountProblems({ ...good, username: 'a'.repeat(25) }).username).toBeDefined()
+    expect(newAccountProblems({ ...good, displayName: '   ' }).displayName).toBe('Enter your name.')
+    expect(newAccountProblems({ ...good, displayName: 'a'.repeat(51) }).displayName).toBeDefined()
   })
 })
 
