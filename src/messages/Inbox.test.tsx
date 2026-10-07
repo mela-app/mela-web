@@ -176,4 +176,24 @@ describe('Inbox', () => {
     expect(await screen.findByText('Say hi to Cal')).toBeInTheDocument()
     expect(screen.getByLabelText('Message Cal')).toHaveFocus()
   })
+
+  it("a message Mela's safety team removed disappears from the open conversation", async () => {
+    const reported = message('ben', 'me', 'something nasty', { readAt: new Date().toISOString() })
+    serve({
+      'GET /v1/me/conversations': inbox([{ user: ben, lastMessage: reported, unreadCount: 0, canMessage: true }]),
+      'GET /v1/me/conversations/ben/messages': () =>
+        json(200, { user: ben, canMessage: true, messages: [message('me', 'ben', 'hello'), reported], hasEarlier: false }),
+    })
+    const events = createInboxEvents()
+    const user = userEvent.setup()
+    render(<Inbox session={session} self={me} events={events} />)
+
+    await user.click(await screen.findByRole('button', { name: /^Ben/ }))
+    expect(await screen.findByText('something nasty')).toBeInTheDocument()
+
+    act(() => events.emit({ type: 'deleted', messageId: reported.id, senderId: 'ben', recipientId: 'me' }))
+
+    expect(screen.queryByText('something nasty')).not.toBeInTheDocument()
+    expect(screen.getByText('hello')).toBeInTheDocument()
+  })
 })

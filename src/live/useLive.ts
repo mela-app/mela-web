@@ -297,6 +297,9 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     socket.on('message:unread_count', (event: { count: number }) => {
       inbox.emit({ type: 'unreadCount', count: event.count })
     })
+    socket.on('message:deleted', (event: { messageId: string; senderId: string; recipientId: string }) => {
+      inbox.emit({ type: 'deleted', ...event })
+    })
 
     return () => {
       settle(false)

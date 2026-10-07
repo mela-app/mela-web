@@ -44,5 +44,7 @@ export type InboxEvent =
   | { type: 'new'; message: DirectMessage; sender: Person; recipient: Person }
   | { type: 'read'; readerId: string; partnerId: string; readAt: string }
   | { type: 'unreadCount'; count: number }
+  // Mela's safety team removed a reported message - from both people's conversation.
+  | { type: 'deleted'; messageId: string; senderId: string; recipientId: string }
   // (Re)connected: anything that came while it was down has to be fetched.
   | { type: 'connected' }
