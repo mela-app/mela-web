@@ -117,6 +117,9 @@ function ConversationList(props: InboxProps & { onOpen(person: Person): void; on
                 return item
               }) ?? current,
           )
+        } else if (event.type === 'deleted') {
+          // Maybe a conversation's last message, or its only one.
+          setReloads((count) => count + 1)
         }
       }),
     [events, self.id],
@@ -402,6 +405,8 @@ function ConversationView(props: InboxProps & { person: Person; onBack(): void }
         } else if (event.type === 'read') {
           if (event.readerId === person.id && event.partnerId === self.id) markSeen(self.id, event.readAt)
           else if (event.readerId === self.id && event.partnerId === person.id) markSeen(person.id, event.readAt)
+        } else if (event.type === 'deleted') {
+          setMessages((current) => current?.filter((message) => message.id !== event.messageId) ?? current)
         }
       }),
     [events, self.id, person.id, add, markSeen, readIfVisible],

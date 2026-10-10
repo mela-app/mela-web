@@ -22,6 +22,8 @@ export interface WatchOptions {
   onTiles(tiles: VideoTile[]): void
   /** The browser holds sound back until the viewer taps the page. */
   onAudioBlocked(blocked: boolean): void
+  /** The browser's local media connection is degraded or recovering. */
+  onWeakConnection(weak: boolean): void
   /** The connection is gone for good: a fresh start is needed. */
   onLost(): void
 }

@@ -1,5 +1,10 @@
 import AgoraRTC from 'agora-rtc-sdk-ng'
-import type { IAgoraRTCRemoteUser, RemoteStreamFallbackType, RemoteStreamType } from 'agora-rtc-sdk-ng'
+import type {
+  AudienceLatencyLevelType,
+  IAgoraRTCRemoteUser,
+  RemoteStreamFallbackType,
+  RemoteStreamType,
+} from 'agora-rtc-sdk-ng'
 import type { VideoCredentials } from '../live/types'
 import { hostFirst, type VideoTile, type WatchOptions, type WatchSession } from './watch'
 
@@ -8,6 +13,9 @@ const WARNINGS_AND_ERRORS = 2
 const LOW_STREAM = 1 as RemoteStreamType
 // On a weak connection: the smaller video first, then sound alone.
 const AUDIO_ONLY_FALLBACK = 2 as RemoteStreamFallbackType
+// A viewer only watches: a deeper buffer (about 1-2 s behind) plays a weak
+// connection smoothly instead of freezing - like the app's viewers.
+const LOW_LATENCY = 1 as AudienceLatencyLevelType
 
 type AgoraCredentials = Extract<VideoCredentials, { provider: 'AGORA' }>
 
@@ -15,9 +23,35 @@ type AgoraCredentials = Extract<VideoCredentials, { provider: 'AGORA' }>
 export async function watchAgora(options: WatchOptions, credentials: AgoraCredentials): Promise<WatchSession> {
   AgoraRTC.setLogLevel(WARNINGS_AND_ERRORS)
   AgoraRTC.disableLogUpload()
-  const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8', role: 'audience' })
+  const client = AgoraRTC.createClient({
+    mode: 'live',
+    codec: 'vp8',
+    role: 'audience',
+    clientRoleOptions: { level: LOW_LATENCY },
+  })
   const users = new Map<string, IAgoraRTCRemoteUser>()
+  const audioOnlyFallbacks = new Set<string>()
   let leaving = false
+  let reconnecting = false
+  let networkPoor = false
+  let poorSamples = 0
+  let healthySamples = 0
+  const reportConnection = () =>
+    options.onWeakConnection(reconnecting || networkPoor || audioOnlyFallbacks.size > 0)
+  const observeQuality = (quality: number) => {
+    if (quality >= 4) {
+      poorSamples = 0
+      healthySamples = 0
+      networkPoor = true
+    } else if (quality === 3) {
+      healthySamples = 0
+      if (++poorSamples >= 2) networkPoor = true
+    } else if (quality === 1 || quality === 2) {
+      poorSamples = 0
+      if (++healthySamples >= 2) networkPoor = false
+    }
+    reportConnection()
+  }
 
   const tileOf = (user: IAgoraRTCRemoteUser): VideoTile => ({
     key: `agora-${user.uid}-${user.videoTrack?.getTrackId() ?? ''}`,
@@ -60,9 +94,19 @@ export async function watchAgora(options: WatchOptions, credentials: AgoraCreden
   })
   client.on('user-left', (user) => {
     users.delete(String(user.uid))
+    audioOnlyFallbacks.delete(String(user.uid))
+    reportConnection()
     showTiles()
   })
+  client.on('network-quality', (quality) => observeQuality(quality.downlinkNetworkQuality))
+  client.on('stream-fallback', (uid, state) => {
+    if (state === 'fallback') audioOnlyFallbacks.add(String(uid))
+    else audioOnlyFallbacks.delete(String(uid))
+    reportConnection()
+  })
   client.on('connection-state-change', (state) => {
+    reconnecting = state === 'RECONNECTING'
+    reportConnection()
     if (state === 'DISCONNECTED' && !leaving) options.onLost()
   })
   client.on('token-privilege-did-expire', () => options.onLost())
