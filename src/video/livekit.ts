@@ -1,4 +1,4 @@
-import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client'
+import { ConnectionQuality, Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client'
 import type { VideoCredentials } from '../live/types'
 import { hostFirst, type VideoTile, type WatchOptions, type WatchSession } from './watch'
 
@@ -10,6 +10,10 @@ export async function watchLiveKit(options: WatchOptions, credentials: LiveKitCr
   const room = new Room({ adaptiveStream: true })
   const audioElements = new Set<HTMLMediaElement>()
   let leaving = false
+  let reconnecting = false
+  let videoPaused = false
+  let networkPoor = false
+  const reportConnection = () => options.onWeakConnection(reconnecting || videoPaused || networkPoor)
 
   const showTiles = () => {
     const tiles: VideoTile[] = []
@@ -54,6 +58,24 @@ export async function watchLiveKit(options: WatchOptions, credentials: LiveKitCr
     .on(RoomEvent.TrackMuted, showTiles)
     .on(RoomEvent.TrackUnmuted, showTiles)
     .on(RoomEvent.ParticipantDisconnected, showTiles)
+    .on(RoomEvent.TrackStreamStateChanged, (_publication, state, participant) => {
+      if (participant.identity !== options.hostId) return
+      videoPaused = state === Track.StreamState.Paused
+      reportConnection()
+    })
+    .on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+      if (participant !== room.localParticipant) return
+      networkPoor = quality === ConnectionQuality.Poor || quality === ConnectionQuality.Lost
+      reportConnection()
+    })
+    .on(RoomEvent.Reconnecting, () => {
+      reconnecting = true
+      reportConnection()
+    })
+    .on(RoomEvent.Reconnected, () => {
+      reconnecting = false
+      reportConnection()
+    })
     .on(RoomEvent.AudioPlaybackStatusChanged, () => options.onAudioBlocked(!room.canPlaybackAudio))
     .on(RoomEvent.Disconnected, () => {
       if (!leaving) options.onLost()

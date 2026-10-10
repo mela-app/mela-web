@@ -16,14 +16,30 @@ interface StageProps {
   paused: boolean
   hostAway: boolean
   audioBlocked: boolean
+  weakConnection?: boolean
   videoLost: boolean
+  /** Lost, and trying again by itself: nothing for the viewer to do yet. */
+  reconnecting?: boolean
   onUnlockAudio(): void
   onReconnect(): void
 }
 
 /** The host's video, anyone on stage beside it, and what to say when there's nothing to show. */
 export function Stage(props: StageProps) {
-  const { tiles, fit, host, guests, moving = {}, connecting, paused, hostAway, audioBlocked, videoLost } = props
+  const {
+    tiles,
+    fit,
+    host,
+    guests,
+    moving = {},
+    connecting,
+    paused,
+    hostAway,
+    audioBlocked,
+    weakConnection = false,
+    videoLost,
+    reconnecting = false,
+  } = props
   const hostTile = tiles.find((tile) => tile.isHost)
   const guestOf = (tile: VideoTile) =>
     guests.find((guest) => guest.id === tile.userId || (tile.agoraUid !== undefined && guest.agoraUid === tile.agoraUid))
@@ -88,6 +104,8 @@ export function Stage(props: StageProps) {
         <StageNotice title="Live paused" body="The host will be back soon." />
       ) : hostAway ? (
         <StageNotice title="The host stepped away" body="They'll be right back." />
+      ) : reconnecting ? (
+        <StageNotice title="Reconnecting…" body="The connection dropped. The live picks up as soon as it's back." />
       ) : videoLost ? (
         <StageNotice title="Video connection lost" body="Check your connection, then try again.">
           <button type="button" className="btn btn-primary" onClick={props.onReconnect}>
@@ -107,6 +125,11 @@ export function Stage(props: StageProps) {
         <button type="button" className="unmute" onClick={props.onUnlockAudio}>
           <SoundOffIcon width={18} height={18} /> Tap to unmute
         </button>
+      )}
+      {weakConnection && !videoLost && (
+        <div className="connection-warning" role="status">
+          Unstable internet
+        </div>
       )}
     </div>
   )

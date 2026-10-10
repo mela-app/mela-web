@@ -18,6 +18,13 @@ const ANSWER_TIMEOUT_MS = 8000
 const MOVE_PREVIEW_TIMEOUT_MS = 1500
 // Signing in reconnects as the account: a message sent meanwhile waits this long for the room.
 const JOIN_WAIT_MS = 5000
+// Lost video: started over this many times by itself (about a minute in all) before asking the viewer.
+export const AUTO_RECONNECTS = 6
+
+/** 1 s, 2 s, 4 s, 8 s, then 15 s between the automatic reconnects. */
+export function reconnectDelayMs(done: number): number {
+  return Math.min(1000 * 2 ** done, 15_000)
+}
 
 type JoinAck = Ack<RoomState & { chatMuted: boolean; chatMutedUntil: string | null }>
 type WatchAck = Ack<RoomState & { messages: ChatMessage[] }>
@@ -29,8 +36,12 @@ export interface Live {
   /** In the live's video (whether or not anyone's camera is on). */
   connected: boolean
   audioBlocked: boolean
+  weakConnection?: boolean
   /** The video connection dropped for good: offer to reconnect. */
   videoLost: boolean
+  /** Trying again by itself after the video (or loading the live) failed - no need to ask the viewer yet. */
+  reconnecting: boolean
+  /** The viewer's own "try again": also starts a new round of automatic reconnects. */
   retry(): void
   unlockAudio(): void
   /** Resolves to what went wrong, or null once sent. */
@@ -53,6 +64,7 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
   const [tiles, setTiles] = useState<VideoTile[]>([])
   const [connected, setConnected] = useState(false)
   const [audioBlocked, setAudioBlocked] = useState(false)
+  const [weakConnection, setWeakConnection] = useState(false)
   const [videoLost, setVideoLost] = useState(false)
   const socketRef = useRef<Socket | null>(null)
   // Settles once this socket is in the live's room: true when it can chat there (an account).
@@ -62,11 +74,31 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
   const likeTimer = useRef<number | null>(null)
   const [inbox] = useState(createInboxEvents)
 
-  const retry = useCallback(() => {
+  const restart = useCallback(() => {
     dispatch({ type: 'retry' })
     setVideoLost(false)
+    setWeakConnection(false)
     setAttempt((count) => count + 1)
   }, [])
+
+  // The video dropped for good (the SDK stops reconnecting after about 45 s
+  // offline) or the live wouldn't load again: started over by itself, waiting
+  // longer each time, before the Reconnect button is left to the viewer.
+  const [autoReconnects, setAutoReconnects] = useState(0)
+  const wantsReconnect = videoLost || (state.phase === 'error' && autoReconnects > 0)
+  const reconnecting = wantsReconnect && autoReconnects < AUTO_RECONNECTS
+  useEffect(() => {
+    if (!reconnecting) return
+    const timer = window.setTimeout(() => {
+      setAutoReconnects((count) => count + 1)
+      restart()
+    }, reconnectDelayMs(autoReconnects))
+    return () => window.clearTimeout(timer)
+  }, [reconnecting, autoReconnects, restart])
+  const retry = useCallback(() => {
+    setAutoReconnects(0)
+    restart()
+  }, [restart])
 
   // What watching takes: video credentials, the ticket for live updates, who's on stage.
   useEffect(() => {
@@ -110,6 +142,9 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
       onAudioBlocked: (blocked) => {
         if (!cancelled) setAudioBlocked(blocked)
       },
+      onWeakConnection: (weak) => {
+        if (!cancelled) setWeakConnection(weak)
+      },
       onLost: () => {
         if (!cancelled) setVideoLost(true)
       },
@@ -122,6 +157,8 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
         video = started
         videoRef.current = started
         setConnected(true)
+        // Back: a later drop gets the whole round of automatic reconnects again.
+        setAutoReconnects(0)
       },
       () => {
         if (!cancelled) setVideoLost(true)
@@ -133,6 +170,7 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
       setTiles([])
       setConnected(false)
       setAudioBlocked(false)
+      setWeakConnection(false)
       void video?.leave()
     }
   }, [playing, watch])
@@ -206,7 +244,7 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     // signs out and comes back watch-only); a ticket that ran out means starting over.
     socket.on('connect_error', (error) => {
       if (error.message !== 'unauthorized') return
-      if (!asAccount) return retry()
+      if (!asAccount) return restart()
       if (authRetried) return
       authRetried = true
       session.invalidate()
@@ -307,7 +345,7 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
       moveTimers.forEach((timer) => window.clearTimeout(timer))
       socket.disconnect()
     }
-  }, [playing, ticket, hostId, signedIn, streamId, session, retry, inbox])
+  }, [playing, ticket, hostId, signedIn, streamId, session, restart, inbox])
 
   // Signed in on this page: whether they already follow the host.
   useEffect(() => {
@@ -390,7 +428,9 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     tiles,
     connected,
     audioBlocked,
+    weakConnection,
     videoLost,
+    reconnecting,
     retry,
     unlockAudio,
     sendChat,

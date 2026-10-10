@@ -46,6 +46,7 @@ function watching(...then: LiveAction[]): TestLive {
     connected: true,
     audioBlocked: false,
     videoLost: false,
+    reconnecting: false,
     retry: vi.fn(),
     unlockAudio: vi.fn(),
     sendChat: vi.fn(async () => null),
@@ -236,6 +237,34 @@ describe('App', () => {
 
     expect(screen.getByRole('heading', { name: 'LIVE has ended' })).toBeInTheDocument()
     expect(screen.getByText('Abebe ended the live. Thanks for watching!')).toBeInTheDocument()
+  })
+
+  it('says it is reconnecting by itself after the video dropped', () => {
+    const live = watching()
+    live.videoLost = true
+    live.reconnecting = true
+    render(<App config={config} session={signedOut()} device={computer} />)
+
+    expect(screen.getByText('Reconnecting…')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument()
+  })
+
+  it('hands the viewer a Reconnect button once the automatic tries are used up', async () => {
+    const live = watching()
+    live.videoLost = true
+    render(<App config={config} session={signedOut()} device={computer} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+
+    expect(live.retry).toHaveBeenCalled()
+  })
+
+  it('keeps the live on screen while a failed reload is retried', () => {
+    const live = watching({ type: 'failed', error: 'Failed to fetch' })
+    live.reconnecting = true
+    render(<App config={config} session={signedOut()} device={computer} />)
+
+    expect(screen.queryByRole('heading', { name: "Couldn't load this live" })).not.toBeInTheDocument()
   })
 
   it('shows a stopped live with the reason given', () => {

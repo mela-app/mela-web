@@ -160,7 +160,7 @@ export function App({ config, session, device }: AppProps) {
         onOpenApp={openInApp}
       />
     )
-  } else if (state.phase === 'error') {
+  } else if (state.phase === 'error' && !live.reconnecting) {
     main = (
       <section className="ended" aria-labelledby="error-title">
         <MelaLogo className="ended-logo" />
@@ -183,7 +183,9 @@ export function App({ config, session, device }: AppProps) {
         paused={state.paused}
         hostAway={state.hostAway}
         audioBlocked={live.audioBlocked}
+        weakConnection={live.weakConnection}
         videoLost={live.videoLost}
+        reconnecting={live.reconnecting}
         onUnlockAudio={live.unlockAudio}
         onReconnect={live.retry}
       />

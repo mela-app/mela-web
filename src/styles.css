@@ -353,6 +353,19 @@
   transform: translateX(-50%);
   cursor: pointer;
 }
+.connection-warning {
+  position: absolute;
+  top: 76px;
+  right: 12px;
+  z-index: 3;
+  padding: 7px 11px;
+  border: 1px solid rgba(245, 166, 35, 0.4);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
 
 /* Over the top of the video: who's live */
 
