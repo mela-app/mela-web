@@ -183,6 +183,9 @@ export function useLive(streamId: string, session: WebSession, signedIn: boolean
     let asAccount = false
     let authRetried = false
     const socket = io({
+      // WebSocket only, like the app: with several API instances, long-polling
+      // would need sticky sessions at the load balancer.
+      transports: ['websocket'],
       auth: (send) => {
         void (signedIn ? session.token() : Promise.resolve(null)).then((token) => {
           asAccount = token !== null
