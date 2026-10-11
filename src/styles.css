@@ -950,6 +950,39 @@
   flex: 1;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
+.auth-agree {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.auth-agree input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  flex: none;
+  accent-color: var(--teal-bright);
+}
+
+.auth-agree a,
+.auth-legal a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.auth-legal {
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--muted);
+}
+
 .form-error {
   margin: 0;
   padding: 10px 12px;

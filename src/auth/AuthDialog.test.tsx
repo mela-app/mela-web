@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../lib/api'
 import type { IdentityOutcome, WebSession } from '../lib/session'
 import { AuthDialog } from './AuthDialog'
@@ -20,13 +20,14 @@ function setup({
   session = {},
   google = fakeGoogle(),
 }: {
-  session?: Partial<Pick<WebSession, 'login' | 'continueWithIdentity' | 'createAccount'>>
+  session?: Partial<Pick<WebSession, 'login' | 'continueWithIdentity' | 'createAccount' | 'legalInfo'>>
   google?: GoogleSignIn | null
 } = {}) {
   const fake = {
     login: vi.fn(async () => undefined),
     continueWithIdentity: vi.fn(async (): Promise<IdentityOutcome> => ({ status: 'SIGNED_IN' })),
     createAccount: vi.fn(async () => undefined),
+    legalInfo: vi.fn(async () => ({ version: '2026-10-12', minimumAge: 18 })),
     ...session,
   }
   const onSignedIn = vi.fn()
@@ -53,7 +54,17 @@ function fakeGoogle(token: string | null = 'google-token') {
   } satisfies GoogleSignIn
 }
 
+// The age step: a date of birth and the Terms agreed to.
+async function passAboutYou(user: ReturnType<typeof userEvent.setup>, birthDate = '1995-04-20') {
+  expect(screen.getByRole('heading', { name: "When's your birthday?" })).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: birthDate } })
+  await user.click(screen.getByRole('checkbox'))
+  await user.click(screen.getByRole('button', { name: 'Continue' }))
+}
+
 describe('AuthDialog', () => {
+  beforeEach(() => window.localStorage.clear())
+
   it('logs in and hands back to the live', async () => {
     const { session, onSignedIn, user } = setup()
     expect(screen.getByRole('dialog', { name: 'Log in to chat with Abebe' })).toBeInTheDocument()
@@ -104,6 +115,7 @@ describe('AuthDialog', () => {
     })
 
     await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+    await passAboutYou(user)
 
     expect(screen.getByRole('heading', { name: 'Choose your username' })).toBeInTheDocument()
     expect(screen.getByText(/abebe@gmail\.com/)).toBeInTheDocument()
@@ -118,6 +130,8 @@ describe('AuthDialog', () => {
       idToken: 'fresh-token',
       username: 'abebe',
       displayName: 'Abebe Kebede',
+      birthDate: '1995-04-20',
+      acceptedLegalVersion: '2026-10-12',
     })
     expect(onSignedIn).toHaveBeenCalledOnce()
     expect(google?.finish).toHaveBeenCalled()
@@ -133,6 +147,7 @@ describe('AuthDialog', () => {
       },
     })
     await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+    await passAboutYou(user)
 
     await user.clear(screen.getByLabelText('Username'))
     await user.type(screen.getByLabelText('Username'), 'taken_name')
@@ -151,6 +166,7 @@ describe('AuthDialog', () => {
   it('checks the name and username before sending them', async () => {
     const { session, user } = setup({ session: { continueWithIdentity: vi.fn(async () => newcomer) } })
     await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+    await passAboutYou(user)
 
     await user.clear(screen.getByLabelText('Name'))
     await user.clear(screen.getByLabelText('Username'))
@@ -170,6 +186,49 @@ describe('AuthDialog', () => {
 
     expect(google?.finish).toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument()
+  })
+
+  it('asks a date of birth and the Terms first - without hinting at the age needed', async () => {
+    const { session, user } = setup({ session: { continueWithIdentity: vi.fn(async () => newcomer) } })
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+
+    expect(screen.queryByText(/18/)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms')
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(screen.getByText('Enter your date of birth')).toBeInTheDocument()
+    expect(screen.getByText('Please agree to continue.')).toBeInTheDocument()
+    expect(session.createAccount).not.toHaveBeenCalled()
+  })
+
+  it('too young: no account, Firebase forgets them, and this browser waits a day', async () => {
+    const { session, google, user } = setup({ session: { continueWithIdentity: vi.fn(async () => newcomer) } })
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+
+    const year = new Date().getFullYear() - 17
+    await passAboutYou(user, `${year}-01-01`)
+
+    expect(screen.getByRole('heading', { name: "Sorry, you can't use Mela" })).toBeInTheDocument()
+    expect(google?.finish).toHaveBeenCalled()
+    expect(session.createAccount).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem('mela.ageGate.lockedUntil')).not.toBeNull()
+  })
+
+  it("the API's own age check ends it the same way", async () => {
+    const { user } = setup({
+      session: {
+        continueWithIdentity: vi.fn(async () => newcomer),
+        createAccount: vi.fn(async () => {
+          throw new ApiError(403, 'Mela is only for people 18 or older.', 'UNDER_AGE')
+        }),
+      },
+    })
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+    await passAboutYou(user)
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(await screen.findByRole('heading', { name: "Sorry, you can't use Mela" })).toBeInTheDocument()
   })
 
   it('does nothing when the Google window is closed', async () => {
