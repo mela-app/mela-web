@@ -1,4 +1,4 @@
-import type { AdminAlert, ChatMessage, Guest, GuestPlacement, PinnedMessage, RoomState, WatchResponse } from './types'
+import type { AdminAlert, ChatMessage, Guest, GuestPlacement, LiveBoard, PinnedMessage, RoomState, WatchResponse } from './types'
 
 // A long live's older messages drop off; the page shows what's on now.
 export const MAX_MESSAGES = 100
@@ -27,6 +27,7 @@ export interface LiveState {
   /** An administrator's own words, when they stopped it. */
   endedMessage: string | null
   alert: AdminAlert | null
+  board: LiveBoard | null
 }
 
 export type LiveAction =
@@ -53,6 +54,7 @@ export type LiveAction =
   | { type: 'chatMuted'; until: Date | null }
   | { type: 'chatUnmuted' }
   | { type: 'alert'; alert: AdminAlert | null }
+  | { type: 'board'; board: LiveBoard | null }
   | { type: 'ended'; reason: string | null; message: string | null }
   | { type: 'banned' }
 
@@ -74,6 +76,7 @@ export const initialLiveState: LiveState = {
   endedReason: null,
   endedMessage: null,
   alert: null,
+  board: null,
 }
 
 export function liveReducer(state: LiveState, action: LiveAction): LiveState {
@@ -101,6 +104,7 @@ export function liveReducer(state: LiveState, action: LiveAction): LiveState {
         paused: action.state.paused,
         hostAway: action.state.hostAway,
         moderatorIds: action.state.moderatorIds,
+        board: action.state.board ?? null,
       }
     case 'chatSnapshot':
       return { ...state, messages: action.messages.slice(-MAX_MESSAGES) }
@@ -125,6 +129,8 @@ export function liveReducer(state: LiveState, action: LiveAction): LiveState {
       return { ...state, hostAway: action.away }
     case 'moderators':
       return { ...state, moderatorIds: action.ids }
+    case 'board':
+      return { ...state, board: action.board }
     case 'guestJoined':
       return { ...state, guests: [...state.guests.filter((guest) => guest.id !== action.guest.id), action.guest] }
     case 'guestLeft':

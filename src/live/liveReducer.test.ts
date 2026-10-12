@@ -110,7 +110,20 @@ describe('liveReducer', () => {
     expect(state).toMatchObject({ viewerCount: 12, likeCount: 40, paused: true, moderatorIds: ['mod-1'] })
   })
 
-  it('remembers why the live ended', () => {
+  it("shows the host's board as the room has it, and as it changes", () => {
+    const board = { text: 'Bingo round 3 at 8:30', x: 0.2, y: 0.1 }
+    let state = liveReducer(playing(), {
+      type: 'room',
+      state: { viewerCount: 1, likeCount: 0, paused: false, hostAway: false, moderatorIds: [], board },
+    })
+    expect(state.board).toEqual(board)
+
+    state = liveReducer(state, { type: 'board', board: { ...board, x: 0.8 } })
+    expect(state.board?.x).toBe(0.8)
+    expect(liveReducer(state, { type: 'board', board: null }).board).toBeNull()
+  })
+
+    it('remembers why the live ended', () => {
     const state = liveReducer(playing(), { type: 'ended', reason: 'LOCKED', message: 'Against the rules' })
     expect(state).toMatchObject({ phase: 'ended', endedReason: 'LOCKED', endedMessage: 'Against the rules' })
   })

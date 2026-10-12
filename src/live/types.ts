@@ -69,6 +69,18 @@ export interface RoomState {
   paused: boolean
   likeCount: number
   moderatorIds: string[]
+  /** The live's board; absent from an older API. */
+  board?: LiveBoard | null
+}
+
+/**
+ * The text the host (or a moderator) put on the live: see-through, placed
+ * at x, y - 0 to 1 within the stage's free space, as in the app.
+ */
+export interface LiveBoard {
+  text: string
+  x: number
+  y: number
 }
 
 export interface AdminAlert {
