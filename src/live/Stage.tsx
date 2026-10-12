@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { Avatar } from '../components/Avatar'
 import { SoundOffIcon } from '../components/Icons'
 import type { Fit, VideoTile } from '../video/watch'
-import type { Guest, GuestPlacement, Person } from './types'
+import type { Guest, GuestPlacement, LiveBoard, Person } from './types'
 
 interface StageProps {
   tiles: VideoTile[]
@@ -20,8 +20,29 @@ interface StageProps {
   videoLost: boolean
   /** Lost, and trying again by itself: nothing for the viewer to do yet. */
   reconnecting?: boolean
+  /** The text the host put on the live, if any. */
+  board?: LiveBoard | null
   onUnlockAudio(): void
   onReconnect(): void
+}
+
+/**
+ * The live's board, where the host put it: x and y place it within the free
+ * space, like Flutter's Align - left x% then back by x% of its own width.
+ */
+function Board({ board }: { board: LiveBoard }) {
+  const style = {
+    left: `${board.x * 100}%`,
+    top: `${board.y * 100}%`,
+    transform: `translate(${-board.x * 100}%, ${-board.y * 100}%)`,
+  } as CSSProperties
+  return (
+    <div className="stage-board-area">
+      <p className="stage-board" style={style} aria-label={`Live board: ${board.text}`}>
+        {board.text}
+      </p>
+    </div>
+  )
 }
 
 /** The host's video, anyone on stage beside it, and what to say when there's nothing to show. */
@@ -99,6 +120,8 @@ export function Stage(props: StageProps) {
           })}
         </div>
       )}
+
+      {props.board && <Board board={props.board} />}
 
       {paused ? (
         <StageNotice title="Live paused" body="The host will be back soon." />

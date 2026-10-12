@@ -1,3 +1,4 @@
+import type { LegalInfo } from '../auth/legal'
 import { api, ApiError } from './api'
 
 export interface WebUser {
@@ -20,6 +21,10 @@ export interface NewAccount {
   idToken: string
   username: string
   displayName: string
+  /** YYYY-MM-DD - the 18+ age check (docs/features/legal.md). */
+  birthDate: string
+  /** The Terms/Privacy version agreed to. */
+  acceptedLegalVersion: string
 }
 
 // Only after a sign-in here does a visit ask the API for a session.
@@ -126,6 +131,12 @@ export class WebSession {
     }
     const { email, displayName, suggestedUsername } = result
     return { status: 'NEEDS_ACCOUNT', profile: { email, displayName, suggestedUsername } }
+  }
+
+  /** The Terms of Service and Privacy Policy in force, and the minimum age. */
+  async legalInfo(): Promise<LegalInfo> {
+    const { version, minimumAge } = await api<LegalInfo>('/v1/legal')
+    return { version, minimumAge }
   }
 
   async createAccount(account: NewAccount): Promise<void> {

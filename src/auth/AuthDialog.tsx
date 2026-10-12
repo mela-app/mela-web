@@ -13,6 +13,7 @@ import { Modal } from '../components/Modal'
 import { ApiError } from '../lib/api'
 import type { NewAccountProfile, WebSession } from '../lib/session'
 import { GoogleSignInError, type GoogleSignIn } from './googleSignIn'
+import { ageOn, isAgeGateLocked, lockAgeGate, PRIVACY_PATH, TERMS_PATH, todayIso, type LegalInfo } from './legal'
 import { isUsernameAvailable, newAccountProblems, type NewAccountProblems } from './validation'
 
 interface AuthDialogProps {
@@ -36,8 +37,9 @@ function failureMessage(error: unknown, loggingIn: boolean): string {
 }
 
 /**
- * Log in, or Continue with Google - which signs up someone new after they
- * pick a username (docs/features/auth.md). On computers, where joining in happens here.
+ * Log in, or Continue with Google - which signs up someone new after their
+ * date of birth and the Terms (18+, docs/features/legal.md) and a username
+ * (docs/features/auth.md). On computers, where joining in happens here.
  */
 export function AuthDialog({ session, google, title, body, onSignedIn, onClose }: AuthDialogProps) {
   const [busy, setBusy] = useState(false)
@@ -49,6 +51,13 @@ export function AuthDialog({ session, google, title, body, onSignedIn, onClose }
   const [shown, setShown] = useState<NewAccountProblems>({})
   const [availability, setAvailability] = useState<Availability>(null)
   const lookup = useRef(0)
+  // Someone new: their date of birth and the Terms come before the username.
+  const [legal, setLegal] = useState<LegalInfo | null>(null)
+  const [aboutYouDone, setAboutYouDone] = useState(false)
+  const [birthDate, setBirthDate] = useState('')
+  const [agreed, setAgreed] = useState(false)
+  const [showAgeProblems, setShowAgeProblems] = useState(false)
+  const [underAge, setUnderAge] = useState(false)
 
   // Loaded before the click, so the browser lets Google's window open.
   useEffect(() => google?.prepare(), [google])
@@ -88,6 +97,9 @@ export function AuthDialog({ session, google, title, body, onSignedIn, onClose }
       if (!token) return
       const outcome = await session.continueWithIdentity(token)
       if (outcome.status === 'SIGNED_IN') return signedIn()
+      if (isAgeGateLocked()) return endTooYoung()
+      setLegal(await session.legalInfo())
+      setAboutYouDone(false)
       setProfile(outcome.profile)
       setAccount({ displayName: outcome.profile.displayName, username: outcome.profile.suggestedUsername })
       setAvailability('available')
@@ -106,6 +118,24 @@ export function AuthDialog({ session, google, title, body, onSignedIn, onClose }
     }, 400)
   }
 
+  // No account, nothing kept, and no trying another date here for a day.
+  const endTooYoung = () => {
+    lockAgeGate()
+    void google?.finish()
+    setProfile(null)
+    setBirthDate('')
+    setUnderAge(true)
+  }
+
+  const submitAboutYou = (event: FormEvent) => {
+    event.preventDefault()
+    setShowAgeProblems(true)
+    const age = ageOn(birthDate)
+    if (age === null || !agreed || !legal) return
+    if (age < legal.minimumAge) return endTooYoung()
+    setAboutYouDone(true)
+  }
+
   const createAccount = (event: FormEvent) => {
     event.preventDefault()
     const problems = newAccountProblems(account)
@@ -117,8 +147,18 @@ export function AuthDialog({ session, google, title, body, onSignedIn, onClose }
           idToken: await google.currentToken(),
           username: account.username,
           displayName: account.displayName.trim(),
+          birthDate,
+          acceptedLegalVersion: legal?.version ?? '',
         })
       } catch (failure) {
+        if (failure instanceof ApiError && failure.code === 'UNDER_AGE') return endTooYoung()
+        if (failure instanceof ApiError && failure.code === 'LEGAL_VERSION_OUTDATED') {
+          // Changed meanwhile: read and accept the new ones.
+          setLegal(await session.legalInfo())
+          setAgreed(false)
+          setShowAgeProblems(false)
+          setAboutYouDone(false)
+        }
         if (failure instanceof ApiError && failure.code === 'USERNAME_TAKEN') setAvailability('taken')
         else if (failure instanceof ApiError && (failure.code === 'EMAIL_TAKEN' || failure.code === 'ACCOUNT_EXISTS')) {
           setProfile(null)
@@ -134,6 +174,77 @@ export function AuthDialog({ session, google, title, body, onSignedIn, onClose }
     setProfile(null)
     setError(null)
     setShown({})
+    setAboutYouDone(false)
+    setAgreed(false)
+    setShowAgeProblems(false)
+  }
+
+  if (underAge) {
+    return (
+      <Modal labelledBy="auth-title" onClose={onClose}>
+        <MelaLogo className="sheet-logo" />
+        <h2 id="auth-title">Sorry, you can&apos;t use Mela</h2>
+        <p className="modal-body">
+          Mela is only for people {legal?.minimumAge ?? 18} or older. We didn&apos;t create an account or keep what you
+          entered.
+        </p>
+        <button type="button" className="btn btn-primary btn-block" onClick={onClose}>
+          OK
+        </button>
+      </Modal>
+    )
+  }
+
+  if (profile && !aboutYouDone) {
+    const ageProblem = showAgeProblems && ageOn(birthDate) === null ? 'Enter your date of birth' : undefined
+    return (
+      <Modal labelledBy="auth-title" onClose={onClose}>
+        <MelaLogo className="sheet-logo" />
+        <h2 id="auth-title">When&apos;s your birthday?</h2>
+        <p className="modal-body">
+          We ask everyone, to make sure Mela is right for you. It won&apos;t be shown on your profile.
+        </p>
+        <form className="auth-form" onSubmit={submitAboutYou} noValidate>
+          <Field label="Date of birth" problem={ageProblem}>
+            <input
+              name="birthday"
+              type="date"
+              autoComplete="bday"
+              min="1900-01-01"
+              max={todayIso()}
+              value={birthDate}
+              onChange={(event) => setBirthDate(event.target.value)}
+            />
+          </Field>
+          <label className="auth-agree">
+            <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
+            <span>
+              I agree to the{' '}
+              <a href={TERMS_PATH} target="_blank" rel="noopener noreferrer">
+                Terms of Service
+              </a>{' '}
+              and{' '}
+              <a href={PRIVACY_PATH} target="_blank" rel="noopener noreferrer">
+                Privacy Policy
+              </a>
+              .
+            </span>
+          </label>
+          {showAgeProblems && !agreed && <span className="field-problem">Please agree to continue.</span>}
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button type="submit" className="btn btn-primary btn-block" disabled={busy}>
+            Continue
+          </button>
+          <button type="button" className="btn btn-text btn-block" onClick={cancelNewAccount} disabled={busy}>
+            Cancel
+          </button>
+        </form>
+      </Modal>
+    )
   }
 
   if (profile) {
@@ -226,6 +337,17 @@ export function AuthDialog({ session, google, title, body, onSignedIn, onClose }
           {busy ? 'Logging in…' : 'Log in'}
         </button>
       </form>
+      <p className="auth-legal">
+        By continuing, you agree to our{' '}
+        <a href={TERMS_PATH} target="_blank" rel="noopener noreferrer">
+          Terms of Service
+        </a>{' '}
+        and{' '}
+        <a href={PRIVACY_PATH} target="_blank" rel="noopener noreferrer">
+          Privacy Policy
+        </a>
+        .
+      </p>
     </Modal>
   )
 }

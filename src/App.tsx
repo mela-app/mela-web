@@ -186,6 +186,7 @@ export function App({ config, session, device }: AppProps) {
         weakConnection={live.weakConnection}
         videoLost={live.videoLost}
         reconnecting={live.reconnecting}
+        board={state.board}
         onUnlockAudio={live.unlockAudio}
         onReconnect={live.retry}
       />
