@@ -25,6 +25,7 @@ describe('copy', () => {
       body: 'Abebe ended the live. Thanks for watching!',
     })
     expect(endedCopy('LOCKED', false, 'Abebe').title).toBe('This live was stopped')
+    expect(endedCopy('HOST_RESTRICTED', false, 'Abebe')).toEqual(endedCopy('LOCKED', false, 'Abebe'))
     expect(endedCopy('SOMETHING_NEW', false, null).body).toBe('This live is over. Thanks for watching!')
     expect(endedCopy(null, true, null)).toEqual({
       title: 'Removed from stream',
