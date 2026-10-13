@@ -86,7 +86,7 @@ export function App({ config, session, device }: AppProps) {
     return () => document.removeEventListener('click', unlock, { capture: true })
   }, [audioBlocked, unlockAudio])
 
-  const openInApp = () => openApp(config, device.platform)
+  const openInApp = () => openApp(config, device.platform, window, device.inApp)
 
   const like = () => {
     if (!user) return setGate('like')

@@ -8,8 +8,10 @@ const IOS_OPEN_GRACE_MS = 1500
  * This live in the app. On Android an intent link, which goes to the install
  * page by itself when the app isn't there; elsewhere the app's own scheme.
  */
-export function openInAppUrl(config: PlayerConfig, platform: Platform): string {
+export function openInAppUrl(config: PlayerConfig, platform: Platform, inApp = false): string {
   const path = `live/${encodeURIComponent(config.streamId)}`
+  // Another app's browser can't open Mela: the get-the-app page says how to go on.
+  if (inApp && platform === 'android') return config.androidInstallUrl
   if (platform === 'android') {
     const fallback = encodeURIComponent(config.androidInstallUrl)
     return `intent://${path}#Intent;scheme=${config.appScheme};package=${config.androidPackage};S.browser_fallback_url=${fallback};end`
@@ -30,8 +32,8 @@ export function liveUrl(config: PlayerConfig, origin: string): string {
 }
 
 /** Opens the app; on iOS, the install page too if nothing opened meanwhile. */
-export function openApp(config: PlayerConfig, platform: Platform, win: Window = window): void {
-  win.location.href = openInAppUrl(config, platform)
+export function openApp(config: PlayerConfig, platform: Platform, win: Window = window, inApp = false): void {
+  win.location.href = openInAppUrl(config, platform, inApp)
   const install = installUrl(config, platform)
   if (platform !== 'ios' || !install) return
   win.setTimeout(() => {

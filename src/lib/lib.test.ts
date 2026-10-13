@@ -21,6 +21,13 @@ describe('app links', () => {
     )
   })
 
+  it("from TikTok's browser, which can't open apps, goes to the get-the-app page instead", () => {
+    expect(openInAppUrl(config, 'android', true)).toBe(config.androidInstallUrl)
+    const tiktok =
+      'Mozilla/5.0 (Linux; Android 14; SM-A546E; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/129.0 Mobile Safari/537.36 musical_ly_36.0.4 BytedanceWebview/d8a21c6'
+    expect(detectDevice({ userAgent: tiktok, maxTouchPoints: 5 }).inApp).toBe(true)
+  })
+
   it("uses the app's own scheme elsewhere", () => {
     expect(openInAppUrl(config, 'ios')).toBe('gamblinglive://live/live-1')
   })
@@ -71,18 +78,18 @@ describe('detectDevice', () => {
     const android = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36'
     const iphone =
       'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
-    expect(detectDevice({ userAgent: android, maxTouchPoints: 5 })).toEqual({ platform: 'android', mobile: true })
-    expect(detectDevice({ userAgent: iphone, maxTouchPoints: 5 })).toEqual({ platform: 'ios', mobile: true })
+    expect(detectDevice({ userAgent: android, maxTouchPoints: 5 })).toEqual({ platform: 'android', mobile: true, inApp: false })
+    expect(detectDevice({ userAgent: iphone, maxTouchPoints: 5 })).toEqual({ platform: 'ios', mobile: true, inApp: false })
   })
 
   it('sees through an iPad asking for the desktop site', () => {
-    expect(detectDevice({ userAgent: macSafari, maxTouchPoints: 5 })).toEqual({ platform: 'ios', mobile: true })
+    expect(detectDevice({ userAgent: macSafari, maxTouchPoints: 5 })).toEqual({ platform: 'ios', mobile: true, inApp: false })
   })
 
   it('treats computers as computers', () => {
     const windows = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-    expect(detectDevice({ userAgent: macSafari, maxTouchPoints: 0 })).toEqual({ platform: 'other', mobile: false })
-    expect(detectDevice({ userAgent: windows, maxTouchPoints: 0 })).toEqual({ platform: 'other', mobile: false })
+    expect(detectDevice({ userAgent: macSafari, maxTouchPoints: 0 })).toEqual({ platform: 'other', mobile: false, inApp: false })
+    expect(detectDevice({ userAgent: windows, maxTouchPoints: 0 })).toEqual({ platform: 'other', mobile: false, inApp: false })
   })
 })
 

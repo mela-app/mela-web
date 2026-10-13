@@ -20,8 +20,8 @@ const config: PlayerConfig = {
   androidInstallUrl: 'https://play.google.com/store/apps/details?id=com.gamblinglive.app',
   iosInstallUrl: null,
 }
-const phone: Device = { platform: 'android', mobile: true }
-const computer: Device = { platform: 'other', mobile: false }
+const phone: Device = { platform: 'android', mobile: true, inApp: false }
+const computer: Device = { platform: 'other', mobile: false, inApp: false }
 
 // Tests play the server's part on the inbox events.
 type TestLive = Live & { inbox: ReturnType<typeof createInboxEvents> }

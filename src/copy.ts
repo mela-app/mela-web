@@ -49,6 +49,8 @@ export function endedCopy(reason: string | null, removed: boolean, hostName: str
     case 'REPLACED':
       return { title: 'LIVE has ended', body: `${who} started a new live.` }
     case 'LOCKED':
+    // The host's hosting was paused - why is between them and the team.
+    case 'HOST_RESTRICTED':
       return { title: 'This live was stopped', body: 'An administrator stopped this live.' }
     default:
       return { title: 'LIVE has ended', body: 'This live is over. Thanks for watching!' }
