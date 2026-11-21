@@ -1223,6 +1223,18 @@
   background: var(--teal);
   color: #fff;
 }
+.dm-photo {
+  display: block;
+  max-width: 80%;
+  margin-bottom: 4px;
+}
+.dm-photo img {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 14px;
+  object-fit: contain;
+}
 .dm.sending .dm-bubble {
   opacity: 0.6;
 }
