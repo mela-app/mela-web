@@ -7,7 +7,7 @@ import type { WebSession, WebUser } from '../lib/session'
 import type { Person } from '../live/types'
 import type { InboxEvents } from './events'
 import { messagesApi } from './messagesApi'
-import type { Conversation, DirectMessage } from './types'
+import { messagePreview, type Conversation, type DirectMessage } from './types'
 
 // The server's limit (backend: DIRECT_MESSAGE_MAX_LENGTH).
 export const MESSAGE_MAX_LENGTH = 1000
@@ -195,7 +195,7 @@ function ConversationRow({ item, selfId, onOpen }: { item: Conversation; selfId:
       <Avatar person={item.user} size="md" />
       <span className="inbox-row-main">
         <span className="inbox-row-name">{item.user.displayName}</span>
-        <span className="inbox-row-preview">{last ? (last.senderId === selfId ? `You: ${last.text}` : last.text) : ''}</span>
+        <span className="inbox-row-preview">{last ? (last.senderId === selfId ? `You: ${messagePreview(last)}` : messagePreview(last)) : ''}</span>
       </span>
       <span className="inbox-row-side">
         {last && <time dateTime={last.createdAt}>{shortTime(last.createdAt)}</time>}
@@ -534,7 +534,16 @@ function ConversationView(props: InboxProps & { person: Person; onBack(): void }
               return (
                 <li key={message.id} className={mine ? 'dm mine' : 'dm'}>
                   {showTime && <span className="dm-time">{messageTime(message.createdAt)}</span>}
-                  <p className="dm-bubble">{message.text}</p>
+                  {message.imageUrl && (
+                    <a className="dm-photo" href={message.imageUrl} target="_blank" rel="noreferrer">
+                      <img
+                        src={message.imageUrl}
+                        alt={mine ? 'Your photo' : `Photo from ${who.displayName}`}
+                        loading="lazy"
+                      />
+                    </a>
+                  )}
+                  {message.text && <p className="dm-bubble">{message.text}</p>}
                   {message === newest && mine && pending.length === 0 && (
                     <span className="dm-status">{message.readAt ? 'Seen' : 'Sent'}</span>
                   )}

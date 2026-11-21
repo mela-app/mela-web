@@ -5,10 +5,19 @@ export interface DirectMessage {
   id: string
   senderId: string
   recipientId: string
+  // A photo's caption - maybe empty.
   text: string
+  // A photo sent from the app; null for plain text.
+  imageUrl?: string | null
   clientId: string | null
   createdAt: string
   readAt: string | null
+}
+
+/** A message as one line (the inbox): a photo reads as one. */
+export function messagePreview(message: DirectMessage): string {
+  if (!message.imageUrl) return message.text
+  return message.text ? `📷 ${message.text}` : '📷 Photo'
 }
 
 export interface Conversation {
