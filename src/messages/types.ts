@@ -9,13 +9,27 @@ export interface DirectMessage {
   text: string
   // A photo sent from the app; null for plain text.
   imageUrl?: string | null
+  // A live shared to the recipient (docs/features/share.md): a card to join it
+  // from. `stream` is null while `streamId` stays once the live is gone for good.
+  streamId?: string | null
+  stream?: SharedLive | null
   clientId: string | null
   createdAt: string
   readAt: string | null
 }
 
-/** A message as one line (the inbox): a photo reads as one. */
+/** A shared live as its card shows it. */
+export interface SharedLive {
+  id: string
+  title: string
+  status: 'LIVE' | 'ENDED'
+  thumbnailUrl: string | null
+  host: Person
+}
+
+/** A message as one line (the inbox): a photo or a shared live reads as one. */
 export function messagePreview(message: DirectMessage): string {
+  if (message.streamId) return message.stream ? `🔴 Shared a live: ${message.stream.title}` : '🔴 Shared a live'
   if (!message.imageUrl) return message.text
   return message.text ? `📷 ${message.text}` : '📷 Photo'
 }
