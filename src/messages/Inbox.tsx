@@ -7,7 +7,7 @@ import type { WebSession, WebUser } from '../lib/session'
 import type { Person } from '../live/types'
 import type { InboxEvents } from './events'
 import { messagesApi } from './messagesApi'
-import { messagePreview, type Conversation, type DirectMessage } from './types'
+import { messagePreview, type Conversation, type DirectMessage, type SharedLive } from './types'
 
 // The server's limit (backend: DIRECT_MESSAGE_MAX_LENGTH).
 export const MESSAGE_MAX_LENGTH = 1000
@@ -534,6 +534,9 @@ function ConversationView(props: InboxProps & { person: Person; onBack(): void }
               return (
                 <li key={message.id} className={mine ? 'dm mine' : 'dm'}>
                   {showTime && <span className="dm-time">{messageTime(message.createdAt)}</span>}
+                  {message.streamId && (
+                    <SharedLiveCard live={message.stream ?? null} sharedBy={mine ? 'You' : who.displayName} />
+                  )}
                   {message.imageUrl && (
                     <a className="dm-photo" href={message.imageUrl} target="_blank" rel="noreferrer">
                       <img
@@ -621,4 +624,28 @@ function failureText(error: unknown): string {
     if (error.status === 400) return error.message.endsWith('.') ? error.message : `${error.message}.`
   }
   return `Not sent. ${errorText(error)}`
+}
+
+/** A live shared in the conversation: its picture and title, and a link to watch while it's on. */
+function SharedLiveCard({ live, sharedBy }: { live: SharedLive | null; sharedBy: string }) {
+  const on = live?.status === 'LIVE'
+  const body = (
+    <>
+      <span className="dm-live-by">{sharedBy} shared a live</span>
+      <span className="dm-live-picture">
+        {live?.thumbnailUrl && <img src={live.thumbnailUrl} alt="" loading="lazy" />}
+        <span className={on ? 'dm-live-badge on' : 'dm-live-badge'}>{on ? 'LIVE' : 'ENDED'}</span>
+      </span>
+      {live && <span className="dm-live-title">{live.title || `${live.host.displayName}'s live`}</span>}
+      {live && <span className="dm-live-host">{live.host.displayName}</span>}
+      <span className="dm-live-action">{on ? 'Watch live' : live ? 'Live ended' : 'No longer available'}</span>
+    </>
+  )
+  return on && live ? (
+    <a className="dm-live" href={`/live/${encodeURIComponent(live.id)}`}>
+      {body}
+    </a>
+  ) : (
+    <div className="dm-live ended">{body}</div>
+  )
 }
